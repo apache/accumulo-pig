@@ -263,4 +263,6 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   }
   
   public void cleanupOnFailure(String failure, Job job) {}
+
+  public void cleanupOnSuccess(String location, Job job) {}
 }
