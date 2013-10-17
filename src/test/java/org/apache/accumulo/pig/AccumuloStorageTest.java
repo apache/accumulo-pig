@@ -33,75 +33,72 @@ import org.apache.pig.data.TupleFactory;
 import org.junit.Test;
 
 public class AccumuloStorageTest {
-	
-	@Test
-	public void testGetMutations4() throws Exception
-	{
-		AccumuloStorage s = new AccumuloStorage();
-		
-		Tuple tuple = TupleFactory.getInstance().newTuple(4);
-		tuple.set(0, "row1");
-		tuple.set(1, "cf1");
-		tuple.set(2, "cq1");
-		tuple.set(3, "val1");
-		
-		Collection<Mutation> muts = s.getMutations(tuple);
-		
-		assertNotNull(muts);
-		assertEquals(1, muts.size());
-		Mutation mut = muts.iterator().next();
-		List<ColumnUpdate> updates = mut.getUpdates();
-		assertEquals(1, updates.size());
-		ColumnUpdate update = updates.get(0);
-		
-		assertTrue(Arrays.equals(((String)tuple.get(0)).getBytes(), mut.getRow()));
-		assertTrue(Arrays.equals(((String)tuple.get(1)).getBytes(), update.getColumnFamily()));
-		assertTrue(Arrays.equals(((String)tuple.get(2)).getBytes(), update.getColumnQualifier()));
-		assertTrue(Arrays.equals(((String)tuple.get(3)).getBytes(), update.getValue()));
-		assertTrue(Arrays.equals("".getBytes(), update.getColumnVisibility()));
-	}
-	
-	@Test
-	public void testGetMutations5() throws Exception
-	{
-		AccumuloStorage s = new AccumuloStorage();
-		
-		Tuple tuple = TupleFactory.getInstance().newTuple(5);
-		tuple.set(0, "row1");
-		tuple.set(1, "cf1");
-		tuple.set(2, "cq1");
-		tuple.set(3, "cv1");
-		tuple.set(4, "val1");
-		
-		Collection<Mutation> muts = s.getMutations(tuple);
-		
-		assertNotNull(muts);
-		assertEquals(1, muts.size());
-		Mutation mut = muts.iterator().next();
-		List<ColumnUpdate> updates = mut.getUpdates();
-		assertEquals(1, updates.size());
-		ColumnUpdate update = updates.get(0);
-		
-		assertTrue(Arrays.equals(((String)tuple.get(0)).getBytes(), mut.getRow()));
-		assertTrue(Arrays.equals(((String)tuple.get(1)).getBytes(), update.getColumnFamily()));
-		assertTrue(Arrays.equals(((String)tuple.get(2)).getBytes(), update.getColumnQualifier()));
-		assertTrue(Arrays.equals(((String)tuple.get(3)).getBytes(), update.getColumnVisibility()));
-		assertTrue(Arrays.equals(((String)tuple.get(4)).getBytes(), update.getValue()));
-	}
-	
-	@Test
-	public void testGetTuple() throws Exception
-	{
-		AccumuloStorage s = new AccumuloStorage();
-		
-		Key key = new Key("row1", "cf1", "cq1", "cv1", 1024L);
-		Value value = new Value("val1".getBytes());
-		Tuple tuple  = s.getTuple(key, value);
-		TestUtils.assertKeyValueEqualsTuple(key, value, tuple);
-		
-		key = new Key("row1", "cf1", "cq1");
-		value = new Value("val1".getBytes());
-		tuple  = s.getTuple(key, value);
-		TestUtils.assertKeyValueEqualsTuple(key, value, tuple);
-	}
+  
+  @Test
+  public void testGetMutations4() throws Exception {
+    AccumuloStorage s = new AccumuloStorage();
+    
+    Tuple tuple = TupleFactory.getInstance().newTuple(4);
+    tuple.set(0, "row1");
+    tuple.set(1, "cf1");
+    tuple.set(2, "cq1");
+    tuple.set(3, "val1");
+    
+    Collection<Mutation> muts = s.getMutations(tuple);
+    
+    assertNotNull(muts);
+    assertEquals(1, muts.size());
+    Mutation mut = muts.iterator().next();
+    List<ColumnUpdate> updates = mut.getUpdates();
+    assertEquals(1, updates.size());
+    ColumnUpdate update = updates.get(0);
+    
+    assertTrue(Arrays.equals(((String) tuple.get(0)).getBytes(), mut.getRow()));
+    assertTrue(Arrays.equals(((String) tuple.get(1)).getBytes(), update.getColumnFamily()));
+    assertTrue(Arrays.equals(((String) tuple.get(2)).getBytes(), update.getColumnQualifier()));
+    assertTrue(Arrays.equals(((String) tuple.get(3)).getBytes(), update.getValue()));
+    assertTrue(Arrays.equals("".getBytes(), update.getColumnVisibility()));
+  }
+  
+  @Test
+  public void testGetMutations5() throws Exception {
+    AccumuloStorage s = new AccumuloStorage();
+    
+    Tuple tuple = TupleFactory.getInstance().newTuple(5);
+    tuple.set(0, "row1");
+    tuple.set(1, "cf1");
+    tuple.set(2, "cq1");
+    tuple.set(3, "cv1");
+    tuple.set(4, "val1");
+    
+    Collection<Mutation> muts = s.getMutations(tuple);
+    
+    assertNotNull(muts);
+    assertEquals(1, muts.size());
+    Mutation mut = muts.iterator().next();
+    List<ColumnUpdate> updates = mut.getUpdates();
+    assertEquals(1, updates.size());
+    ColumnUpdate update = updates.get(0);
+    
+    assertTrue(Arrays.equals(((String) tuple.get(0)).getBytes(), mut.getRow()));
+    assertTrue(Arrays.equals(((String) tuple.get(1)).getBytes(), update.getColumnFamily()));
+    assertTrue(Arrays.equals(((String) tuple.get(2)).getBytes(), update.getColumnQualifier()));
+    assertTrue(Arrays.equals(((String) tuple.get(3)).getBytes(), update.getColumnVisibility()));
+    assertTrue(Arrays.equals(((String) tuple.get(4)).getBytes(), update.getValue()));
+  }
+  
+  @Test
+  public void testGetTuple() throws Exception {
+    AccumuloStorage s = new AccumuloStorage();
+    
+    Key key = new Key("row1", "cf1", "cq1", "cv1", 1024L);
+    Value value = new Value("val1".getBytes());
+    Tuple tuple = s.getTuple(key, value);
+    TestUtils.assertKeyValueEqualsTuple(key, value, tuple);
+    
+    key = new Key("row1", "cf1", "cq1");
+    value = new Value("val1".getBytes());
+    tuple = s.getTuple(key, value);
+    TestUtils.assertKeyValueEqualsTuple(key, value, tuple);
+  }
 }

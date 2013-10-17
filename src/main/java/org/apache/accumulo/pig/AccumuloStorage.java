@@ -34,65 +34,56 @@ import org.apache.pig.data.TupleFactory;
 
 /**
  * A LoadStoreFunc for retrieving data from and storing data to Accumulo
- *
- * A Key/Val pair will be returned as tuples: (key, colfam, colqual, colvis, timestamp, value). All fields except timestamp are DataByteArray, timestamp is a long.
  * 
- * Tuples can be written in 2 forms:
- *  (key, colfam, colqual, colvis, value)
- *    OR
- *  (key, colfam, colqual, value)
+ * A Key/Val pair will be returned as tuples: (key, colfam, colqual, colvis, timestamp, value). All fields except timestamp are DataByteArray, timestamp is a
+ * long.
+ * 
+ * Tuples can be written in 2 forms: (key, colfam, colqual, colvis, value) OR (key, colfam, colqual, value)
  * 
  */
-public class AccumuloStorage extends AbstractAccumuloStorage
-{
-    private static final Log LOG = LogFactory.getLog(AccumuloStorage.class);
-
-    public AccumuloStorage(){}
-
-	@Override
-	protected Tuple getTuple(Key key, Value value) throws IOException {
-		// and wrap it in a tuple
-        Tuple tuple = TupleFactory.getInstance().newTuple(6);
-        tuple.set(0, new DataByteArray(key.getRow().getBytes()));
-        tuple.set(1, new DataByteArray(key.getColumnFamily().getBytes()));
-        tuple.set(2, new DataByteArray(key.getColumnQualifier().getBytes()));
-        tuple.set(3, new DataByteArray(key.getColumnVisibility().getBytes()));
-        tuple.set(4, new Long(key.getTimestamp()));
-        tuple.set(5, new DataByteArray(value.get()));
-        return tuple;
-	}
-	
-	@Override
-	public Collection<Mutation> getMutations(Tuple tuple) throws ExecException, IOException {
-		
-		try {
-			Mutation mut = new Mutation(Utils.objToText(tuple.get(0)));
-			Text cf = Utils.objToText(tuple.get(1));
-			Text cq = Utils.objToText(tuple.get(2));
-			
-			if(tuple.size() > 4)
-			{
-				Text cv = Utils.objToText(tuple.get(3));
-				Value val = new Value(Utils.objToBytes(tuple.get(4)));
-				if(cv.getLength() == 0)
-				{
-					mut.put(cf, cq, val);
-				}
-				else
-				{
-					mut.put(cf, cq, new ColumnVisibility(cv), val);
-				}
-			}
-			else
-			{
-				Value val = new Value(Utils.objToBytes(tuple.get(3)));
-				mut.put(cf, cq, val);
-			}
-			
-			return Collections.singleton(mut);
-		} catch (IOException e) {
-		System.err.println("Error on Tuple: "+tuple);
-		throw e;
-	}
-	}
+public class AccumuloStorage extends AbstractAccumuloStorage {
+  private static final Log LOG = LogFactory.getLog(AccumuloStorage.class);
+  
+  public AccumuloStorage() {}
+  
+  @Override
+  protected Tuple getTuple(Key key, Value value) throws IOException {
+    // and wrap it in a tuple
+    Tuple tuple = TupleFactory.getInstance().newTuple(6);
+    tuple.set(0, new DataByteArray(key.getRow().getBytes()));
+    tuple.set(1, new DataByteArray(key.getColumnFamily().getBytes()));
+    tuple.set(2, new DataByteArray(key.getColumnQualifier().getBytes()));
+    tuple.set(3, new DataByteArray(key.getColumnVisibility().getBytes()));
+    tuple.set(4, new Long(key.getTimestamp()));
+    tuple.set(5, new DataByteArray(value.get()));
+    return tuple;
+  }
+  
+  @Override
+  public Collection<Mutation> getMutations(Tuple tuple) throws ExecException, IOException {
+    
+    try {
+      Mutation mut = new Mutation(Utils.objToText(tuple.get(0)));
+      Text cf = Utils.objToText(tuple.get(1));
+      Text cq = Utils.objToText(tuple.get(2));
+      
+      if (tuple.size() > 4) {
+        Text cv = Utils.objToText(tuple.get(3));
+        Value val = new Value(Utils.objToBytes(tuple.get(4)));
+        if (cv.getLength() == 0) {
+          mut.put(cf, cq, val);
+        } else {
+          mut.put(cf, cq, new ColumnVisibility(cv), val);
+        }
+      } else {
+        Value val = new Value(Utils.objToBytes(tuple.get(3)));
+        mut.put(cf, cq, val);
+      }
+      
+      return Collections.singleton(mut);
+    } catch (IOException e) {
+      System.err.println("Error on Tuple: " + tuple);
+      throw e;
+    }
+  }
 }
