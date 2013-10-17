@@ -1,4 +1,4 @@
-<!--
+  <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
   this work for additional information regarding copyright ownership.
@@ -18,7 +18,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.accumulo</groupId>
   <artifactId>accumulo-pig</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.4.4-SNAPSHOT</version>
   
   <dependencies>
     <dependency>
@@ -40,6 +40,11 @@
       <groupId>org.apache.accumulo</groupId>
       <artifactId>accumulo-core</artifactId>
       <version>1.4.4</version>
+    </dependency>
+    <dependency>
+      <groupId>joda-time</groupId>
+      <artifactId>joda-time</artifactId>
+      <version>1.6</version>
     </dependency>
   </dependencies>
   

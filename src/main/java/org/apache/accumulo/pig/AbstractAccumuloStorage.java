@@ -101,11 +101,13 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   protected abstract Tuple getTuple(Key key, Value value) throws IOException;
   
   @Override
+  @SuppressWarnings("rawtypes")
   public InputFormat getInputFormat() {
     return new AccumuloInputFormat();
   }
   
   @Override
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public void prepareToRead(RecordReader reader, PigSplit split) {
     this.reader = reader;
   }
@@ -237,6 +239,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     }
   }
   
+  @SuppressWarnings("rawtypes")
   public OutputFormat getOutputFormat() {
     return new AccumuloOutputFormat();
   }
@@ -245,6 +248,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     // we don't care about types, they all get casted to ByteBuffers
   }
   
+  @SuppressWarnings({"rawtypes", "unchecked"})
   public void prepareToWrite(RecordWriter writer) {
     this.writer = writer;
   }
