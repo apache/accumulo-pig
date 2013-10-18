@@ -25,6 +25,10 @@ public class Utils {
   }
   
   public static byte[] objToBytes(Object o) {
+    if (o == null) {
+      return new byte[0];
+    }
+    
     if (o instanceof String) {
       String str = (String) o;
       return str.getBytes();
