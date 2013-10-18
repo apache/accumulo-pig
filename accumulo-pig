@@ -1,0 +1,7 @@
+#!/bin/sh
+
+export PIG_CLASSPATH=./target/accumulo-pig-1.4.4-SNAPSHOT.jar:$ACCUMULO_HOME/lib/accumulo-core-1.4.5-SNAPSHOT.jar:$ACCUMULO_HOME/lib/libthrift-0.6.1.jar:$ACCUMULO_HOME/lib/cloudtrace-1.4.5-SNAPSHOT.jar
+
+pig -v -x mapreduce 
+
+# vim: ft=sh
