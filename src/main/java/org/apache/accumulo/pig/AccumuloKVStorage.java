@@ -22,7 +22,6 @@ import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Properties;
 
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
@@ -33,7 +32,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Text;
 import org.apache.pig.LoadStoreCaster;
 import org.apache.pig.ResourceSchema;
-import org.apache.pig.LoadPushDown.RequiredFieldList;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.builtin.Utf8StorageConverter;
@@ -43,27 +41,30 @@ import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.util.ObjectSerializer;
-import org.apache.pig.impl.util.UDFContext;
 import org.joda.time.DateTime;
 
 /**
- * A LoadStoreFunc for retrieving data from and storing data to Accumulo
+ * A LoadStoreFunc for retrieving data from and storing data to Accumulo.
  * 
  * A Key/Val pair will be returned as tuples: (key, colfam, colqual, colvis, timestamp, value). All fields except timestamp are DataByteArray, timestamp is a
  * long.
  * 
- * Tuples can be written in 2 forms: (key, colfam, colqual, colvis, value) OR (key, colfam, colqual, value)
+ * <p>Tuples require at least key, column family, column qualifier and value; however column visibility or column visibility and timestamp may also be
+ * provided:</p>
  * 
+ * <ul>
+ * <li>(key, colfam, colqual, value)</li>
+ * <li>(key, colfam, colqual, colvis, value)</li>
+ * <li>(key, colfam, colqual, colvis, timestamp, value)</li> 
+ * </ul>
  */
-public class TypedAccumuloStorage extends AbstractAccumuloStorage {
-  private static final Log LOG = LogFactory.getLog(TypedAccumuloStorage.class);
+public class AccumuloKVStorage extends AbstractAccumuloStorage {
+  private static final Log LOG = LogFactory.getLog(AccumuloKVStorage.class);
   protected LoadStoreCaster caster;
-  protected String contextSignature = null;
   
-  private ResourceSchema schema_;
-  private RequiredFieldList requiredFieldList;
+  private ResourceSchema schema;
   
-  public TypedAccumuloStorage() {
+  public AccumuloKVStorage() {
     this.caster = new Utf8StorageConverter();
   }
   
@@ -82,7 +83,7 @@ public class TypedAccumuloStorage extends AbstractAccumuloStorage {
   
   @Override
   public Collection<Mutation> getMutations(Tuple tuple) throws ExecException, IOException {
-    ResourceFieldSchema[] fieldSchemas = (schema_ == null) ? null : schema_.getFields();
+    ResourceFieldSchema[] fieldSchemas = (schema == null) ? null : schema.getFields();
     
     Text t = tupleToText(tuple, 0, fieldSchemas);
     
@@ -90,7 +91,12 @@ public class TypedAccumuloStorage extends AbstractAccumuloStorage {
     Text cf = tupleToText(tuple, 1, fieldSchemas);
     Text cq = tupleToText(tuple, 2, fieldSchemas);
     
-    if (tuple.size() > 4) {
+    if (4 == tuple.size()) {
+      byte[] valueBytes = tupleToBytes(tuple, 3, fieldSchemas);
+      Value val = new Value(valueBytes);
+      
+      mut.put(cf, cq, val);
+    } else if (5 == tuple.size()) {
       Text cv = tupleToText(tuple, 3, fieldSchemas);
       
       byte[] valueBytes = tupleToBytes(tuple, 4, fieldSchemas);
@@ -102,39 +108,35 @@ public class TypedAccumuloStorage extends AbstractAccumuloStorage {
         mut.put(cf, cq, new ColumnVisibility(cv), val);
       }
     } else {
-      byte[] valueBytes = tupleToBytes(tuple, 3, fieldSchemas);
+      if (6 < tuple.size()) {
+        LOG.debug("Ignoring additional entries in tuple of length " + tuple.size());
+      }
+      
+      Text cv = tupleToText(tuple, 3, fieldSchemas);
+      
+      long ts = objToLong(tuple, 4, fieldSchemas);
+      
+      byte[] valueBytes = tupleToBytes(tuple, 5, fieldSchemas);
+      
       Value val = new Value(valueBytes);
-      mut.put(cf, cq, val);
+      if (cv.getLength() == 0) {
+        mut.put(cf, cq, val);
+      } else {
+        mut.put(cf, cq, new ColumnVisibility(cv), ts, val);
+      }
     }
     
     return Collections.singleton(mut);
   }
   
   @Override
-  public void setUDFContextSignature(String signature) {
-    this.contextSignature = signature;
-  }
-  
-  @Override
-  public void setStoreFuncUDFContextSignature(String signature) {
-    this.contextSignature = signature;
-  }
-  
-  /**
-   * Returns UDFProperties based on <code>contextSignature</code>.
-   */
-  private Properties getUDFProperties() {
-    return UDFContext.getUDFContext().getUDFProperties(this.getClass(), new String[] {contextSignature});
-  }
-  
-  @Override
   public void checkSchema(ResourceSchema s) throws IOException {
     if (!(caster instanceof LoadStoreCaster)) {
-      LOG.error("Caster must implement LoadStoreCaster for writing to HBase.");
+      LOG.error("Caster must implement LoadStoreCaster for writing to Accumulo.");
       throw new IOException("Bad Caster " + caster.getClass());
     }
-    schema_ = s;
-    getUDFProperties().setProperty(contextSignature + "_schema", ObjectSerializer.serialize(schema_));
+    schema = s;
+    getUDFProperties().setProperty(contextSignature + "_schema", ObjectSerializer.serialize(schema));
   }
   
   private Text tupleToText(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException {
@@ -154,6 +156,67 @@ public class TypedAccumuloStorage extends AbstractAccumuloStorage {
     
     return objToBytes(o, type);
     
+  }
+  
+  private long objToLong(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException { 
+    Object o = tuple.get(i);
+    byte type = schemaToType(o, i, fieldSchemas);
+    
+    switch (type) {
+      case DataType.LONG:
+        return (Long) o;
+      case DataType.CHARARRAY:
+        String timestampString = (String) o;
+        try {
+          return Long.parseLong(timestampString);
+        } catch (NumberFormatException e) {
+          final String msg = "Could not cast chararray into long: " + timestampString;
+          LOG.error(msg);
+          throw new IOException(msg, e);
+        }
+      case DataType.DOUBLE:
+        Double doubleTimestamp = (Double) o;
+        return doubleTimestamp.longValue();
+      case DataType.FLOAT:
+        Float floatTimestamp = (Float) o;
+        return floatTimestamp.longValue();
+      case DataType.INTEGER:
+        Integer intTimestamp = (Integer) o;
+        return intTimestamp.longValue();
+      case DataType.BIGINTEGER:
+        BigInteger bigintTimestamp = (BigInteger) o;
+        long longTimestamp = bigintTimestamp.longValue();
+        
+        BigInteger recreatedTimestamp = BigInteger.valueOf(longTimestamp);
+        
+        if (!recreatedTimestamp.equals(bigintTimestamp)) {
+          LOG.warn("Downcasting BigInteger into Long results in a change of the original value. Was " + bigintTimestamp + " but is now " + longTimestamp);
+        }
+        
+        return longTimestamp;
+      case DataType.BIGDECIMAL:
+        BigDecimal bigdecimalTimestamp = (BigDecimal) o;
+        try {
+          return bigdecimalTimestamp.longValueExact();
+        } catch (ArithmeticException e) {
+          long convertedLong = bigdecimalTimestamp.longValue();
+          LOG.warn("Downcasting BigDecimal into Long results in a loss of information. Was " + bigdecimalTimestamp + " but is now " + convertedLong);
+          return convertedLong;
+        }
+      case DataType.BYTEARRAY:
+        DataByteArray bytes = (DataByteArray) o;
+        try {
+          return Long.parseLong(bytes.toString());
+        } catch (NumberFormatException e) {
+          final String msg = "Could not cast bytes into long: " + bytes.toString();
+          LOG.error(msg);
+          throw new IOException(msg, e);
+        }
+      default:
+        LOG.error("Could not convert " + o + " of class " + o.getClass() + " into long.");
+        throw new IOException("Could not convert " + o.getClass() + " into long");
+        
+    }
   }
   
   private Text objToText(Object o, byte type) throws IOException {

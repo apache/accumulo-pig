@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.accumulo.core.client.mapreduce.AccumuloInputFormat;
 import org.apache.accumulo.core.client.mapreduce.AccumuloOutputFormat;
@@ -46,6 +47,7 @@ import org.apache.pig.StoreFuncInterface;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PigSplit;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.util.UDFContext;
 
 /**
  * A LoadStoreFunc for retrieving data from and storing data to Accumulo
@@ -79,6 +81,8 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   int maxWriteThreads = 10;
   long maxMutationBufferSize = 10 * 1000 * 1000;
   int maxLatency = 10 * 1000;
+  
+  protected String contextSignature = null;
   
   public AbstractAccumuloStorage() {}
   
@@ -213,12 +217,19 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   
   @Override
   public void setUDFContextSignature(String signature) {
-    
+    this.contextSignature = signature;
   }
   
   /* StoreFunc methods */
   public void setStoreFuncUDFContextSignature(String signature) {
+    this.contextSignature = signature;
     
+  }  
+  /**
+   * Returns UDFProperties based on <code>contextSignature</code>.
+   */
+  protected Properties getUDFProperties() {
+    return UDFContext.getUDFContext().getUDFProperties(this.getClass(), new String[] {contextSignature});
   }
   
   public String relToAbsPathForStoreLocation(String location, Path curDir) throws IOException {

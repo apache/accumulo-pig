@@ -30,13 +30,14 @@ import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
+import org.junit.Assert;
 import org.junit.Test;
 
-public class AccumuloStorageTest {
+public class AccumuloKVStorageTest {
   
   @Test
   public void testGetMutations4() throws Exception {
-    AccumuloStorage s = new AccumuloStorage();
+    AccumuloKVStorage s = new AccumuloKVStorage();
     
     Tuple tuple = TupleFactory.getInstance().newTuple(4);
     tuple.set(0, "row1");
@@ -62,7 +63,7 @@ public class AccumuloStorageTest {
   
   @Test
   public void testGetMutations5() throws Exception {
-    AccumuloStorage s = new AccumuloStorage();
+    AccumuloKVStorage s = new AccumuloKVStorage();
     
     Tuple tuple = TupleFactory.getInstance().newTuple(5);
     tuple.set(0, "row1");
@@ -88,8 +89,37 @@ public class AccumuloStorageTest {
   }
   
   @Test
+  public void testGetMutations6() throws Exception {
+    AccumuloKVStorage s = new AccumuloKVStorage();
+    
+    Tuple tuple = TupleFactory.getInstance().newTuple(6);
+    tuple.set(0, "row");
+    tuple.set(1, "cf");
+    tuple.set(2, "cq");
+    tuple.set(3, "cv");
+    tuple.set(4, new Long(1));
+    tuple.set(5, "value");
+    
+    Collection<Mutation> mutations = s.getMutations(tuple);
+    Assert.assertNotNull(mutations);
+    Assert.assertEquals(1, mutations.size());
+    Mutation m = mutations.iterator().next();
+    
+    List<ColumnUpdate> updates = m.getUpdates();
+    Assert.assertEquals(1, updates.size());
+    ColumnUpdate update = updates.get(0);
+    
+    assertTrue(Arrays.equals(((String) tuple.get(0)).getBytes(), m.getRow()));
+    assertTrue(Arrays.equals(((String) tuple.get(1)).getBytes(), update.getColumnFamily()));
+    assertTrue(Arrays.equals(((String) tuple.get(2)).getBytes(), update.getColumnQualifier()));
+    assertTrue(Arrays.equals(((String) tuple.get(3)).getBytes(), update.getColumnVisibility()));
+    assertEquals(((Long) tuple.get(4)).longValue(), update.getTimestamp());
+    assertTrue(Arrays.equals(((String) tuple.get(5)).getBytes(), update.getValue()));
+  }
+  
+  @Test
   public void testGetTuple() throws Exception {
-    AccumuloStorage s = new AccumuloStorage();
+    AccumuloKVStorage s = new AccumuloKVStorage();
     
     Key key = new Key("row1", "cf1", "cq1", "cv1", 1024L);
     Value value = new Value("val1".getBytes());
