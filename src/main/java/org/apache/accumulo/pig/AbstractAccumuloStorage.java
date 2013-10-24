@@ -17,10 +17,13 @@
 package org.apache.accumulo.pig;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.accumulo.core.client.mapreduce.AccumuloInputFormat;
@@ -31,6 +34,7 @@ import org.apache.accumulo.core.data.Range;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.util.Pair;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -42,12 +46,19 @@ import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.pig.LoadFunc;
+import org.apache.pig.LoadStoreCaster;
 import org.apache.pig.ResourceSchema;
 import org.apache.pig.StoreFuncInterface;
+import org.apache.pig.ResourceSchema.ResourceFieldSchema;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PigSplit;
+import org.apache.pig.data.DataBag;
+import org.apache.pig.data.DataByteArray;
+import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.util.ObjectSerializer;
 import org.apache.pig.impl.util.UDFContext;
+import org.joda.time.DateTime;
 
 /**
  * A LoadStoreFunc for retrieving data from and storing data to Accumulo
@@ -60,6 +71,8 @@ import org.apache.pig.impl.util.UDFContext;
  */
 public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreFuncInterface {
   private static final Log LOG = LogFactory.getLog(AbstractAccumuloStorage.class);
+  
+  private static final String COLON = ":", COMMA = ",";
   
   private Configuration conf;
   private RecordReader<Key,Value> reader;
@@ -81,7 +94,9 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   int maxWriteThreads = 10;
   long maxMutationBufferSize = 10 * 1000 * 1000;
   int maxLatency = 10 * 1000;
-  
+
+  protected LoadStoreCaster caster;
+  protected ResourceSchema schema;
   protected String contextSignature = null;
   
   public AbstractAccumuloStorage() {}
@@ -118,7 +133,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   
   private void setLocationFromUri(String location) throws IOException {
     // ex:
-    // accumulo://table1?instance=myinstance&user=root&password=secret&zookeepers=127.0.0.1:2181&auths=PRIVATE,PUBLIC&columns=col1|cq1,col2|cq2&start=abc&end=z
+    // accumulo://table1?instance=myinstance&user=root&password=secret&zookeepers=127.0.0.1:2181&auths=PRIVATE,PUBLIC&fetch_columns=col1:cq1,col2:cq2&start=abc&end=z
     String columns = "";
     try {
       if (!location.startsWith("accumulo://"))
@@ -137,7 +152,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
             zookeepers = pair[1];
           else if (pair[0].equals("auths"))
             auths = pair[1];
-          else if (pair[0].equals("columns"))
+          else if (pair[0].equals("fetch_columns"))
             columns = pair[1];
           else if (pair[0].equals("start"))
             start = pair[1];
@@ -158,13 +173,13 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
       if (auths == null || auths.equals("")) {
         authorizations = new Authorizations();
       } else {
-        authorizations = new Authorizations(auths.split(","));
+        authorizations = new Authorizations(auths.split(COMMA));
       }
       
-      if (!columns.equals("")) {
-        for (String cfCq : columns.split(",")) {
-          if (cfCq.contains("|")) {
-            String[] c = cfCq.split("\\|");
+      if (!StringUtils.isEmpty(columns)) {
+        for (String cfCq : columns.split(COMMA)) {
+          if (cfCq.contains(COLON)) {
+            String[] c = cfCq.split(COLON);
             columnFamilyColumnQualifierPairs.add(new Pair<Text,Text>(new Text(c[0]), new Text(c[1])));
           } else {
             columnFamilyColumnQualifierPairs.add(new Pair<Text,Text>(new Text(cfCq), null));
@@ -175,7 +190,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     } catch (Exception e) {
       throw new IOException(
           "Expected 'accumulo://<table>[?instance=<instanceName>&user=<user>&password=<password>&zookeepers=<zookeepers>&auths=<authorizations>&"
-              + "[start=startRow,end=endRow,columns=[cf1|cq1,cf2|cq2,...],write_buffer_size_bytes=10000000,write_threads=10,write_latency_ms=30000]]': "
+              + "[start=startRow,end=endRow,fetch_columns=[cf1:cq1,cf2:cq2,...],write_buffer_size_bytes=10000000,write_threads=10,write_latency_ms=30000]]': "
               + e.getMessage());
     }
   }
@@ -255,10 +270,6 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     return new AccumuloOutputFormat();
   }
   
-  public void checkSchema(ResourceSchema schema) throws IOException {
-    // we don't care about types, they all get casted to ByteBuffers
-  }
-  
   @SuppressWarnings({"rawtypes", "unchecked"})
   public void prepareToWrite(RecordWriter writer) {
     this.writer = writer;
@@ -280,4 +291,153 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   public void cleanupOnFailure(String failure, Job job) {}
 
   public void cleanupOnSuccess(String location, Job job) {}
+  
+  @Override
+  public void checkSchema(ResourceSchema s) throws IOException {
+    if (!(caster instanceof LoadStoreCaster)) {
+      LOG.error("Caster must implement LoadStoreCaster for writing to Accumulo.");
+      throw new IOException("Bad Caster " + caster.getClass());
+    }
+    schema = s;
+    getUDFProperties().setProperty(contextSignature + "_schema", ObjectSerializer.serialize(schema));
+  }
+
+  
+  protected Text tupleToText(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException {
+    Object o = tuple.get(i);
+    byte type = schemaToType(o, i, fieldSchemas);
+    
+    return objToText(o, type);
+  }
+  
+  protected Text objectToText(Object o, ResourceFieldSchema fieldSchema) throws IOException {
+    byte type = schemaToType(o, fieldSchema);
+    
+    return objToText(o, type);
+  }
+  
+  protected byte schemaToType(Object o, ResourceFieldSchema fieldSchema) {
+    return (fieldSchema == null) ? DataType.findType(o) : fieldSchema.getType();
+  }
+  
+  protected byte schemaToType(Object o, int i, ResourceFieldSchema[] fieldSchemas) {
+    return (fieldSchemas == null) ? DataType.findType(o) : fieldSchemas[i].getType();
+  }
+  
+  protected byte[] tupleToBytes(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException {
+    Object o = tuple.get(i);
+    byte type = schemaToType(o, i, fieldSchemas);
+    
+    return objToBytes(o, type);
+    
+  }
+  
+  protected long objToLong(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException { 
+    Object o = tuple.get(i);
+    byte type = schemaToType(o, i, fieldSchemas);
+    
+    switch (type) {
+      case DataType.LONG:
+        return (Long) o;
+      case DataType.CHARARRAY:
+        String timestampString = (String) o;
+        try {
+          return Long.parseLong(timestampString);
+        } catch (NumberFormatException e) {
+          final String msg = "Could not cast chararray into long: " + timestampString;
+          LOG.error(msg);
+          throw new IOException(msg, e);
+        }
+      case DataType.DOUBLE:
+        Double doubleTimestamp = (Double) o;
+        return doubleTimestamp.longValue();
+      case DataType.FLOAT:
+        Float floatTimestamp = (Float) o;
+        return floatTimestamp.longValue();
+      case DataType.INTEGER:
+        Integer intTimestamp = (Integer) o;
+        return intTimestamp.longValue();
+      case DataType.BIGINTEGER:
+        BigInteger bigintTimestamp = (BigInteger) o;
+        long longTimestamp = bigintTimestamp.longValue();
+        
+        BigInteger recreatedTimestamp = BigInteger.valueOf(longTimestamp);
+        
+        if (!recreatedTimestamp.equals(bigintTimestamp)) {
+          LOG.warn("Downcasting BigInteger into Long results in a change of the original value. Was " + bigintTimestamp + " but is now " + longTimestamp);
+        }
+        
+        return longTimestamp;
+      case DataType.BIGDECIMAL:
+        BigDecimal bigdecimalTimestamp = (BigDecimal) o;
+        try {
+          return bigdecimalTimestamp.longValueExact();
+        } catch (ArithmeticException e) {
+          long convertedLong = bigdecimalTimestamp.longValue();
+          LOG.warn("Downcasting BigDecimal into Long results in a loss of information. Was " + bigdecimalTimestamp + " but is now " + convertedLong);
+          return convertedLong;
+        }
+      case DataType.BYTEARRAY:
+        DataByteArray bytes = (DataByteArray) o;
+        try {
+          return Long.parseLong(bytes.toString());
+        } catch (NumberFormatException e) {
+          final String msg = "Could not cast bytes into long: " + bytes.toString();
+          LOG.error(msg);
+          throw new IOException(msg, e);
+        }
+      default:
+        LOG.error("Could not convert " + o + " of class " + o.getClass() + " into long.");
+        throw new IOException("Could not convert " + o.getClass() + " into long");
+        
+    }
+  }
+  
+  protected Text objToText(Object o, byte type) throws IOException {
+    return new Text(objToBytes(o, type));
+  }
+  
+  @SuppressWarnings("unchecked")
+  protected byte[] objToBytes(Object o, byte type) throws IOException {
+    if (o == null)
+      return null;
+    switch (type) {
+      case DataType.BYTEARRAY:
+        return ((DataByteArray) o).get();
+      case DataType.BAG:
+        return caster.toBytes((DataBag) o);
+      case DataType.CHARARRAY:
+        return caster.toBytes((String) o);
+      case DataType.DOUBLE:
+        return caster.toBytes((Double) o);
+      case DataType.FLOAT:
+        return caster.toBytes((Float) o);
+      case DataType.INTEGER:
+        return caster.toBytes((Integer) o);
+      case DataType.LONG:
+        return caster.toBytes((Long) o);
+      case DataType.BIGINTEGER:
+        return caster.toBytes((BigInteger) o);
+      case DataType.BIGDECIMAL:
+        return caster.toBytes((BigDecimal) o);
+      case DataType.BOOLEAN:
+        return caster.toBytes((Boolean) o);
+      case DataType.DATETIME:
+        return caster.toBytes((DateTime) o);
+        
+        // The type conversion here is unchecked.
+        // Relying on DataType.findType to do the right thing.
+      case DataType.MAP:
+        return caster.toBytes((Map<String,Object>) o);
+        
+      case DataType.NULL:
+        return null;
+      case DataType.TUPLE:
+        return caster.toBytes((Tuple) o);
+      case DataType.ERROR:
+        throw new IOException("Unable to determine type of " + o.getClass());
+      default:
+        throw new IOException("Unable to find a converter for tuple field " + o);
+    }
+  }
 }
