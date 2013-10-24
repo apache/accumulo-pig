@@ -39,14 +39,14 @@ public class TestUtils {
     Iterator<Entry<String,String>> expectedIter = expectedConf.iterator();
     while (expectedIter.hasNext()) {
       Entry<String,String> e = expectedIter.next();
-      assertEquals(actualConf.get(e.getKey()), expectedConf.get(e.getKey()));
+      assertEquals("Values differed for " + e.getKey(), expectedConf.get(e.getKey()), actualConf.get(e.getKey()));
     }
     
     // Basically, for all the keys in actualConf, make sure the values in both confs are equal
     Iterator<Entry<String,String>> actualIter = actualConf.iterator();
     while (actualIter.hasNext()) {
       Entry<String,String> e = actualIter.next();
-      assertEquals(actualConf.get(e.getKey()), expectedConf.get(e.getKey()));
+      assertEquals("Values differed for " + e.getKey(), expectedConf.get(e.getKey()), actualConf.get(e.getKey()));
     }
   }
   

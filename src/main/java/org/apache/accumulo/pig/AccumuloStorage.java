@@ -1,23 +1,33 @@
 package org.apache.accumulo.pig;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
 
+import org.apache.accumulo.core.client.IteratorSetting;
+import org.apache.accumulo.core.client.mapreduce.AccumuloInputFormat;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
+import org.apache.accumulo.core.data.PartialKey;
 import org.apache.accumulo.core.data.Value;
+import org.apache.accumulo.core.iterators.user.WholeRowIterator;
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
 import org.apache.pig.backend.executionengine.ExecException;
+import org.apache.pig.data.DataByteArray;
 import org.apache.pig.data.DataType;
+import org.apache.pig.data.InternalMap;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.data.TupleFactory;
 
 import com.google.common.collect.Lists;
 
@@ -39,8 +49,72 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   
   @Override
   protected Tuple getTuple(Key key, Value value) throws IOException {
-    // TODO Auto-generated method stub
-    return null;
+    
+    SortedMap<Key,Value> rowKVs = WholeRowIterator.decodeRow(key, value);
+    List<Tuple> columns = new ArrayList<Tuple>(rowKVs.size());
+    
+    List<Object> tupleEntries = Lists.newLinkedList();
+    Iterator<Entry<Key,Value>> iter = rowKVs.entrySet().iterator();
+    List<Entry<Key,Value>> aggregate = Lists.newLinkedList();
+    Entry<Key,Value> currentEntry = null;
+    
+    while (iter.hasNext()) {
+      if (null == currentEntry) {
+        currentEntry = iter.next();
+      } else {
+        Entry<Key,Value> nextEntry = iter.next();
+        
+        // If we have the same colfam
+        if (currentEntry.getKey().equals(nextEntry.getKey(), PartialKey.ROW_COLFAM)) {
+          // Aggregate this entry into the map
+          aggregate.add(nextEntry);
+        } else {
+          // Flush and start again
+          InternalMap map = aggregate(aggregate);
+          tupleEntries.add(map);
+          
+          aggregate = Lists.newLinkedList();
+        }
+      }
+    }
+    
+    if (!aggregate.isEmpty()) {
+      tupleEntries.add(aggregate(aggregate));
+    }
+    
+    // and wrap it in a tuple
+    Tuple tuple = TupleFactory.getInstance().newTuple(tupleEntries.size() + 1);
+    tuple.set(0, new DataByteArray(key.getRow().getBytes()));
+    int i = 1;
+    for (Object obj : tupleEntries)  {
+      tuple.set(i, obj);
+      i++;
+    }
+    
+    return tuple;
+  }
+  
+  private InternalMap aggregate(List<Entry<Key,Value>> columns)  {
+    InternalMap map = new InternalMap();
+    for (Entry<Key,Value> column : columns) {
+      map.put(column.getKey().getColumnQualifier().toString(), new DataByteArray(column.getValue().get()));
+    }
+    
+    return map;
+  }
+  
+  private Tuple columnToTuple(Text colfam, Text colqual, Text colvis, long ts, Value val) throws IOException {
+    Tuple tuple = TupleFactory.getInstance().newTuple(5);
+    tuple.set(0, new DataByteArray(colfam.getBytes()));
+    tuple.set(1, new DataByteArray(colqual.getBytes()));
+    tuple.set(2, new DataByteArray(colvis.getBytes()));
+    tuple.set(3, new Long(ts));
+    tuple.set(4, new DataByteArray(val.get()));
+    return tuple;
+  }
+  
+  protected void configureInputFormat(Configuration conf) {
+    AccumuloInputFormat.addIterator(conf, new IteratorSetting(50, WholeRowIterator.class));
   }
   
   @Override
@@ -57,6 +131,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     Mutation mutation = new Mutation(objectToText(tupleIter.next(), (null == fieldSchemas) ? null : fieldSchemas[0]));
     
     // TODO Can these be lifted up to members of the class instead of this method?
+    // Not sure if AccumuloStorage instances need to be thread-safe or not
     final Text _cfHolder = new Text(), _cqHolder = new Text();
     
     int columnOffset = 0;
@@ -94,9 +169,9 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
             
             mutation.put(_cfHolder, _cqHolder, value);
           } else {
-            // Just put the Map's key into the CF
-            _cfHolder.set(entry.getKey());
-            mutation.put(_cfHolder, EMPTY_TEXT, value);
+            // Just put the Map's key into the CQ
+            _cqHolder.set(entry.getKey());
+            mutation.put(EMPTY_TEXT, _cqHolder, value);
           }
         }
       } else if (null == cf) {
@@ -109,13 +184,13 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
         // and then shove the value into the Value
         int index = cf.indexOf(COLON);
         if (-1 == index) {
-          _cfHolder.set(cf);
+          _cqHolder.set(cf);
           
-          mutation.put(_cfHolder, EMPTY_TEXT, value);
+          mutation.put(EMPTY_TEXT, _cqHolder, value);
         } else {
-          byte[] cfBytes = cf.getBytes(); 
+          byte[] cfBytes = cf.getBytes();
           _cfHolder.set(cfBytes, 0, index);
-          _cqHolder.set(cfBytes, index+1, cfBytes.length - (index + 1));
+          _cqHolder.set(cfBytes, index + 1, cfBytes.length - (index + 1));
           
           mutation.put(_cfHolder, _cqHolder, value);
         }

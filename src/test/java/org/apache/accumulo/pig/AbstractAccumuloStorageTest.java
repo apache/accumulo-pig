@@ -98,7 +98,7 @@ public class AbstractAccumuloStorageTest {
   }
   
   public String getDefaultLoadLocation() {
-    return "accumulo://table1?instance=myinstance&user=root&password=secret&zookeepers=127.0.0.1:2181&auths=PRIVATE,PUBLIC&columns=col1|cq1,col2|cq2,col3&start=abc&end=z";
+    return "accumulo://table1?instance=myinstance&user=root&password=secret&zookeepers=127.0.0.1:2181&auths=PRIVATE,PUBLIC&fetch_columns=col1:cq1,col2:cq2,col3&start=abc&end=z";
   }
   
   public String getDefaultStoreLocation() {
