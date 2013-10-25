@@ -208,7 +208,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
       AccumuloInputFormat.setInputInfo(conf, user, password.getBytes(), table, authorizations);
       AccumuloInputFormat.setZooKeeperInstance(conf, inst, zookeepers);
       if (columnFamilyColumnQualifierPairs.size() > 0) {
-        LOG.info("columns: " + columnFamilyColumnQualifierPairs);
+        LOG.debug("columns: " + columnFamilyColumnQualifierPairs);
         AccumuloInputFormat.fetchColumns(conf, columnFamilyColumnQualifierPairs);
       }
       

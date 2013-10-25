@@ -23,6 +23,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
 import org.apache.pig.backend.executionengine.ExecException;
+import org.apache.pig.builtin.Utf8StorageConverter;
 import org.apache.pig.data.DataByteArray;
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.InternalMap;
@@ -38,7 +39,13 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   
   protected final List<String> columnSpecs;
   
+  public AccumuloStorage() {
+    this("");
+  }
+  
   public AccumuloStorage(String columns) {
+    this.caster = new Utf8StorageConverter();
+    
     if (!StringUtils.isBlank(columns)) {
       String[] columnArray = StringUtils.split(columns, COMMA);
       columnSpecs = Lists.newArrayList(columnArray);
@@ -51,7 +58,6 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   protected Tuple getTuple(Key key, Value value) throws IOException {
     
     SortedMap<Key,Value> rowKVs = WholeRowIterator.decodeRow(key, value);
-    List<Tuple> columns = new ArrayList<Tuple>(rowKVs.size());
     
     List<Object> tupleEntries = Lists.newLinkedList();
     Iterator<Entry<Key,Value>> iter = rowKVs.entrySet().iterator();
@@ -103,16 +109,6 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     return map;
   }
   
-  private Tuple columnToTuple(Text colfam, Text colqual, Text colvis, long ts, Value val) throws IOException {
-    Tuple tuple = TupleFactory.getInstance().newTuple(5);
-    tuple.set(0, new DataByteArray(colfam.getBytes()));
-    tuple.set(1, new DataByteArray(colqual.getBytes()));
-    tuple.set(2, new DataByteArray(colvis.getBytes()));
-    tuple.set(3, new Long(ts));
-    tuple.set(4, new DataByteArray(val.get()));
-    return tuple;
-  }
-  
   protected void configureInputFormat(Configuration conf) {
     AccumuloInputFormat.addIterator(conf, new IteratorSetting(50, WholeRowIterator.class));
   }
@@ -123,7 +119,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     
     Iterator<Object> tupleIter = tuple.iterator();
     
-    if (1 <= tuple.size()) {
+    if (1 >= tuple.size()) {
       log.debug("Ignoring tuple of size " + tuple.size());
       return Collections.emptyList();
     }
@@ -146,7 +142,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
       }
       
       // Grab the type for this field
-      byte type = schemaToType(o, fieldSchemas[tupleOffset]);
+      byte type = schemaToType(o, (null == fieldSchemas) ? null : fieldSchemas[tupleOffset]);
       
       // If we have a Map, we want to treat every Entry as a column in this record
       // placing said column in the column family unless this instance of AccumuloStorage
@@ -164,10 +160,22 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
           
           // If we have a CF, use it and push the Map's key down to the CQ
           if (null != cf) {
-            _cfHolder.set(cf);
-            _cqHolder.set(entry.getKey());
+            int index = cf.indexOf(COLON);
             
-            mutation.put(_cfHolder, _cqHolder, value);
+            // No colon in the provided column
+            if (-1 == index) {
+              _cfHolder.set(cf);
+              _cqHolder.set(entry.getKey());
+              
+              mutation.put(_cfHolder, _cqHolder, value);
+            } else {
+              _cfHolder.set(cf.getBytes(), 0, index);
+              
+              _cqHolder.set(cf.getBytes(), index + 1, cf.length() - (index + 1));
+              _cqHolder.append(entry.getKey().getBytes(), 0, entry.getKey().length());
+              
+              mutation.put(_cfHolder, _cqHolder, value);
+            }
           } else {
             // Just put the Map's key into the CQ
             _cqHolder.set(entry.getKey());
