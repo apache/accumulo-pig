@@ -67,6 +67,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     while (iter.hasNext()) {
       if (null == currentEntry) {
         currentEntry = iter.next();
+        aggregate.add(currentEntry);
       } else {
         Entry<Key,Value> nextEntry = iter.next();
         
@@ -75,11 +76,14 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
           // Aggregate this entry into the map
           aggregate.add(nextEntry);
         } else {
+          currentEntry = nextEntry;
+          
           // Flush and start again
           InternalMap map = aggregate(aggregate);
           tupleEntries.add(map);
           
           aggregate = Lists.newLinkedList();
+          aggregate.add(currentEntry);
         }
       }
     }
@@ -92,7 +96,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     Tuple tuple = TupleFactory.getInstance().newTuple(tupleEntries.size() + 1);
     tuple.set(0, new DataByteArray(key.getRow().getBytes()));
     int i = 1;
-    for (Object obj : tupleEntries)  {
+    for (Object obj : tupleEntries) {
       tuple.set(i, obj);
       i++;
     }
@@ -100,10 +104,11 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     return tuple;
   }
   
-  private InternalMap aggregate(List<Entry<Key,Value>> columns)  {
+  private InternalMap aggregate(List<Entry<Key,Value>> columns) {
     InternalMap map = new InternalMap();
     for (Entry<Key,Value> column : columns) {
-      map.put(column.getKey().getColumnQualifier().toString(), new DataByteArray(column.getValue().get()));
+      map.put(column.getKey().getColumnFamily().toString() + COLON + column.getKey().getColumnQualifier().toString(),
+          new DataByteArray(column.getValue().get()));
     }
     
     return map;

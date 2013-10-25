@@ -8,12 +8,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.accumulo.core.data.ColumnUpdate;
+import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
+import org.apache.accumulo.core.data.Value;
+import org.apache.accumulo.core.iterators.user.WholeRowIterator;
+import org.apache.pig.data.DataByteArray;
+import org.apache.pig.data.InternalMap;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 public class AccumuloStorageTest {
@@ -292,6 +298,112 @@ public class AccumuloStorageTest {
     }
     
     Assert.assertTrue("Did not find all expectations", expectations.isEmpty());
+  }
+  
+  @Test
+  public void testSingleKey() throws IOException {
+    AccumuloStorage storage = new AccumuloStorage();
+    
+    List<Key> keys = Lists.newArrayList();
+    List<Value> values = Lists.newArrayList();
+    
+    keys.add(new Key("1", "", "col1"));
+    values.add(new Value("value1".getBytes()));
+    
+    Key k = new Key("1");
+    Value v = WholeRowIterator.encodeRow(keys, values);
+    
+    Tuple t = storage.getTuple(k, v);
+    
+    Assert.assertEquals(2, t.size());
+    
+    Assert.assertEquals("1", t.get(0).toString());
+    
+    InternalMap map = new InternalMap();
+    map.put(":col1", new DataByteArray("value1"));
+    
+    Assert.assertEquals(map, t.get(1));
+  }
+  
+  @Test
+  public void testSingleColumn() throws IOException {
+    AccumuloStorage storage = new AccumuloStorage();
+    
+    List<Key> keys = Lists.newArrayList();
+    List<Value> values = Lists.newArrayList();
+    
+    keys.add(new Key("1", "col1", "cq1"));
+    keys.add(new Key("1", "col1", "cq2"));
+    keys.add(new Key("1", "col1", "cq3"));
+    
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value2".getBytes()));
+    values.add(new Value("value3".getBytes()));
+    
+    Key k = new Key("1");
+    Value v = WholeRowIterator.encodeRow(keys, values);
+    
+    Tuple t = storage.getTuple(k, v);
+    
+    Assert.assertEquals(2, t.size());
+    
+    Assert.assertEquals("1", t.get(0).toString());
+    
+    InternalMap map = new InternalMap();
+    map.put("col1:cq1", new DataByteArray("value1"));
+    map.put("col1:cq2", new DataByteArray("value2"));
+    map.put("col1:cq3", new DataByteArray("value3"));
+    
+    Assert.assertEquals(map, t.get(1));
+  }
+  
+  @Test
+  public void testMultipleColumns() throws IOException {
+    AccumuloStorage storage = new AccumuloStorage();
+    
+    List<Key> keys = Lists.newArrayList();
+    List<Value> values = Lists.newArrayList();
+    
+    keys.add(new Key("1", "col1", "cq1"));
+    keys.add(new Key("1", "col1", "cq2"));
+    keys.add(new Key("1", "col1", "cq3"));
+    keys.add(new Key("1", "col2", "cq1"));
+    keys.add(new Key("1", "col3", "cq1"));
+    keys.add(new Key("1", "col3", "cq2"));
+    
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value2".getBytes()));
+    values.add(new Value("value3".getBytes()));
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value2".getBytes()));
+    
+    Key k = new Key("1");
+    Value v = WholeRowIterator.encodeRow(keys, values);
+    
+    Tuple t = storage.getTuple(k, v);
+    
+    Assert.assertEquals(4, t.size());
+    
+    Assert.assertEquals("1", t.get(0).toString());
+    
+    InternalMap map = new InternalMap();
+    map.put("col1:cq1", new DataByteArray("value1"));
+    map.put("col1:cq2", new DataByteArray("value2"));
+    map.put("col1:cq3", new DataByteArray("value3"));
+    
+    Assert.assertEquals(map, t.get(1));
+    
+    map = new InternalMap();
+    map.put("col2:cq1", new DataByteArray("value1"));
+    
+    Assert.assertEquals(map, t.get(2));
+    
+    map = new InternalMap();
+    map.put("col3:cq1", new DataByteArray("value1"));
+    map.put("col3:cq2", new DataByteArray("value2"));
+    
+    Assert.assertEquals(map, t.get(3));
   }
   
 }
