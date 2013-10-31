@@ -39,6 +39,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   public static final String METADATA_SUFFIX = "_metadata";
   
   protected final List<String> columnSpecs;
+  protected final boolean aggregateColfams;
   
   // Not sure if AccumuloStorage instances need to be thread-safe or not
   final Text _cfHolder = new Text(), _cqHolder = new Text();
@@ -47,8 +48,17 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     this("");
   }
   
+  public AccumuloStorage(boolean aggregateColfams) {
+    this("", aggregateColfams);
+  }
+  
   public AccumuloStorage(String columns) {
+    this(columns, false);
+  }
+  
+  public AccumuloStorage(String columns, boolean aggregateColfams) {
     this.caster = new Utf8StorageConverter();
+    this.aggregateColfams = aggregateColfams;
     
     // TODO It would be nice to have some other means than enumerating
     // the CF for every column in the Tuples we're going process
@@ -77,8 +87,8 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
       } else {
         Entry<Key,Value> nextEntry = iter.next();
         
-        // If we have the same colfam
-        if (currentEntry.getKey().equals(nextEntry.getKey(), PartialKey.ROW_COLFAM)) {
+        // If we're not aggregating colfams together, or we are and we have the same colfam
+        if (!aggregateColfams || currentEntry.getKey().equals(nextEntry.getKey(), PartialKey.ROW_COLFAM)) {
           // Aggregate this entry into the map
           aggregate.add(nextEntry);
         } else {
@@ -208,6 +218,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
    */
   protected void addColumn(Mutation mutation, String columnDef, String columnName, Value columnValue) {
     if (null == columnDef && null == columnName) {
+      // TODO Emit a counter here somehow?
       log.warn("Was provided no name or definition for column. Ignoring value");
       return;
     }

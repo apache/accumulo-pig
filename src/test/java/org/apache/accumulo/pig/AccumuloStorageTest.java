@@ -358,8 +358,8 @@ public class AccumuloStorageTest {
   }
   
   @Test
-  public void testMultipleColumns() throws IOException {
-    AccumuloStorage storage = new AccumuloStorage();
+  public void testMultipleColumnsAggregateColfams() throws IOException {
+    AccumuloStorage storage = new AccumuloStorage(true);
     
     List<Key> keys = Lists.newArrayList();
     List<Value> values = Lists.newArrayList();
@@ -404,6 +404,47 @@ public class AccumuloStorageTest {
     map.put("col3:cq2", new DataByteArray("value2"));
     
     Assert.assertEquals(map, t.get(3));
+  }
+  
+  @Test
+  public void testMultipleColumnsNoColfamAggregate() throws IOException {
+    AccumuloStorage storage = new AccumuloStorage(false);
+    
+    List<Key> keys = Lists.newArrayList();
+    List<Value> values = Lists.newArrayList();
+    
+    keys.add(new Key("1", "col1", "cq1"));
+    keys.add(new Key("1", "col1", "cq2"));
+    keys.add(new Key("1", "col1", "cq3"));
+    keys.add(new Key("1", "col2", "cq1"));
+    keys.add(new Key("1", "col3", "cq1"));
+    keys.add(new Key("1", "col3", "cq2"));
+    
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value2".getBytes()));
+    values.add(new Value("value3".getBytes()));
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value1".getBytes()));
+    values.add(new Value("value2".getBytes()));
+    
+    Key k = new Key("1");
+    Value v = WholeRowIterator.encodeRow(keys, values);
+    
+    Tuple t = storage.getTuple(k, v);
+    
+    Assert.assertEquals(2, t.size());
+    
+    Assert.assertEquals("1", t.get(0).toString());
+    
+    InternalMap map = new InternalMap();
+    map.put("col1:cq1", new DataByteArray("value1"));
+    map.put("col1:cq2", new DataByteArray("value2"));
+    map.put("col1:cq3", new DataByteArray("value3"));
+    map.put("col2:cq1", new DataByteArray("value1"));
+    map.put("col3:cq1", new DataByteArray("value1"));
+    map.put("col3:cq2", new DataByteArray("value2"));
+    
+    Assert.assertEquals(map, t.get(1));
   }
   
 }
