@@ -67,8 +67,8 @@ public class AccumuloStorageTest {
     Assert.assertEquals(1, colUpdates.size());
     
     ColumnUpdate colUpdate = colUpdates.get(0);
-    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), new byte[0]));
-    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), "col".getBytes()));
+    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), "col".getBytes()));
+    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), new byte[0]));
     Assert.assertTrue("Values not equal", Arrays.equals(colUpdate.getValue(), "value".getBytes()));
   }
   
@@ -120,8 +120,8 @@ public class AccumuloStorageTest {
     Assert.assertEquals(4, colUpdates.size());
     
     ColumnUpdate colUpdate = colUpdates.get(0);
-    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), new byte[0]));
-    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), "col1".getBytes()));
+    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), "col1".getBytes()));
+    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), new byte[0]));
     Assert.assertTrue("Values not equal", Arrays.equals(colUpdate.getValue(), "value1".getBytes()));
     
     colUpdate = colUpdates.get(1);
@@ -135,8 +135,8 @@ public class AccumuloStorageTest {
     Assert.assertTrue("Values not equal", Arrays.equals(colUpdate.getValue(), "value3".getBytes()));
     
     colUpdate = colUpdates.get(3);
-    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), new byte[0]));
-    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), "col2".getBytes()));
+    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), "col2".getBytes()));
+    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), new byte[0]));
     Assert.assertTrue("Values not equal", Arrays.equals(colUpdate.getValue(), "value4".getBytes()));
   }
   
@@ -161,8 +161,8 @@ public class AccumuloStorageTest {
     Assert.assertEquals(1, colUpdates.size());
     
     ColumnUpdate colUpdate = colUpdates.get(0);
-    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), new byte[0]));
-    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), "col".getBytes()));
+    Assert.assertTrue("CF not equal", Arrays.equals(colUpdate.getColumnFamily(), "col".getBytes()));
+    Assert.assertTrue("CQ not equal", Arrays.equals(colUpdate.getColumnQualifier(), new byte[0]));
     Assert.assertTrue("Values not equal", Arrays.equals(colUpdate.getValue(), "value1".getBytes()));
   }
   
@@ -194,7 +194,7 @@ public class AccumuloStorageTest {
     Assert.assertEquals(5, colUpdates.size());
     
     Map<Entry<String,String>,String> expectations = Maps.newHashMap();
-    expectations.put(Maps.immutableEntry("", "col"), "value1");
+    expectations.put(Maps.immutableEntry("col", ""), "value1");
     expectations.put(Maps.immutableEntry("", "mapcol1"), "mapval1");
     expectations.put(Maps.immutableEntry("", "mapcol2"), "mapval2");
     expectations.put(Maps.immutableEntry("", "mapcol3"), "mapval3");

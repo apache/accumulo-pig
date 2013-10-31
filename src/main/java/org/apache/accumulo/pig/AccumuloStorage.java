@@ -1,7 +1,6 @@
 package org.apache.accumulo.pig;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -37,7 +36,12 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   private static final String COMMA = ",", COLON = ":";
   private static final Text EMPTY_TEXT = new Text(new byte[0]);
   
+  public static final String METADATA_SUFFIX = "_metadata";
+  
   protected final List<String> columnSpecs;
+  
+  // Not sure if AccumuloStorage instances need to be thread-safe or not
+  final Text _cfHolder = new Text(), _cqHolder = new Text();
   
   public AccumuloStorage() {
     this("");
@@ -46,6 +50,8 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   public AccumuloStorage(String columns) {
     this.caster = new Utf8StorageConverter();
     
+    // TODO It would be nice to have some other means than enumerating
+    // the CF for every column in the Tuples we're going process
     if (!StringUtils.isBlank(columns)) {
       String[] columnArray = StringUtils.split(columns, COMMA);
       columnSpecs = Lists.newArrayList(columnArray);
@@ -121,7 +127,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   @Override
   public Collection<Mutation> getMutations(Tuple tuple) throws ExecException, IOException {
     final ResourceFieldSchema[] fieldSchemas = (schema == null) ? null : schema.getFields();
-    
+      
     Iterator<Object> tupleIter = tuple.iterator();
     
     if (1 >= tuple.size()) {
@@ -129,25 +135,21 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
       return Collections.emptyList();
     }
     
-    Mutation mutation = new Mutation(objectToText(tupleIter.next(), (null == fieldSchemas) ? null : fieldSchemas[0]));
-    
-    // TODO Can these be lifted up to members of the class instead of this method?
-    // Not sure if AccumuloStorage instances need to be thread-safe or not
-    final Text _cfHolder = new Text(), _cqHolder = new Text();
+    Mutation mutation = new Mutation(objectToText(tupleIter.next(), (null == fieldSchemas) ? null : fieldSchemas[0]));    
     
     int columnOffset = 0;
     int tupleOffset = 1;
     while (tupleIter.hasNext()) {
       Object o = tupleIter.next();
-      String cf = null;
+      String family = null;
       
       // Figure out if the user provided a specific columnfamily to use.
       if (columnOffset < columnSpecs.size()) {
-        cf = columnSpecs.get(columnOffset);
+        family = columnSpecs.get(columnOffset);
       }
       
       // Grab the type for this field
-      byte type = schemaToType(o, (null == fieldSchemas) ? null : fieldSchemas[tupleOffset]);
+      final byte type = schemaToType(o, (null == fieldSchemas) ? null : fieldSchemas[tupleOffset]);
       
       // If we have a Map, we want to treat every Entry as a column in this record
       // placing said column in the column family unless this instance of AccumuloStorage
@@ -159,53 +161,25 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
         
         for (Entry<String,Object> entry : map.entrySet()) {
           Object entryObject = entry.getValue();
-          byte entryType = DataType.findType(entryObject);
           
-          Value value = new Value(objToBytes(entryObject, entryType));
-          
-          // If we have a CF, use it and push the Map's key down to the CQ
-          if (null != cf) {
-            int index = cf.indexOf(COLON);
+          // Treat a null value in the map as the lack of this column
+          // The input may have come from a structured source where the
+          // column could not have been omitted. We can handle the lack of the column
+          if (null != entryObject) {
+            byte entryType = DataType.findType(entryObject);
+            Value value = new Value(objToBytes(entryObject, entryType));
             
-            // No colon in the provided column
-            if (-1 == index) {
-              _cfHolder.set(cf);
-              _cqHolder.set(entry.getKey());
-              
-              mutation.put(_cfHolder, _cqHolder, value);
-            } else {
-              _cfHolder.set(cf.getBytes(), 0, index);
-              
-              _cqHolder.set(cf.getBytes(), index + 1, cf.length() - (index + 1));
-              _cqHolder.append(entry.getKey().getBytes(), 0, entry.getKey().length());
-              
-              mutation.put(_cfHolder, _cqHolder, value);
-            }
-          } else {
-            // Just put the Map's key into the CQ
-            _cqHolder.set(entry.getKey());
-            mutation.put(EMPTY_TEXT, _cqHolder, value);
+            addColumn(mutation, family, entry.getKey(), value);
           }
         }
-      } else if (null == cf) {
-        // We don't know what column to place the value into
-        log.warn("Was provided no column family for non-Map entry in the tuple at offset " + tupleOffset);
       } else {
-        Value value = new Value(objToBytes(o, type));
+        byte[] bytes = objToBytes(o, type);
         
-        // We have something that isn't a Map, use the provided CF as a column name
-        // and then shove the value into the Value
-        int index = cf.indexOf(COLON);
-        if (-1 == index) {
-          _cqHolder.set(cf);
+        if (null != bytes) {
+          Value value = new Value(bytes);
           
-          mutation.put(EMPTY_TEXT, _cqHolder, value);
-        } else {
-          byte[] cfBytes = cf.getBytes();
-          _cfHolder.set(cfBytes, 0, index);
-          _cqHolder.set(cfBytes, index + 1, cfBytes.length - (index + 1));
-          
-          mutation.put(_cfHolder, _cqHolder, value);
+          // We don't have any column name from non-Maps
+          addColumn(mutation, family, null, value);
         }
       }
       
@@ -218,5 +192,52 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     }
     
     return Collections.singletonList(mutation);
+  }
+  
+  /**
+   * Adds column and value to the given mutation. A columnfamily and optional column qualifier
+   * or column qualifier prefix is pulled from {@link columnDef} with the family and qualifier 
+   * delimiter being a colon. If {@link columnName} is non-null, it will be appended to the qualifier.
+   * 
+   * If both the {@link columnDef} and {@link columnName} are null, nothing is added to the mutation
+   * 
+   * @param mutation
+   * @param columnDef
+   * @param columnName
+   * @param columnValue
+   */
+  protected void addColumn(Mutation mutation, String columnDef, String columnName, Value columnValue) {
+    if (null == columnDef && null == columnName) {
+      log.warn("Was provided no name or definition for column. Ignoring value");
+      return;
+    }
+    
+    if (null != columnDef) {
+      // use the provided columnDef to make a cf (with optional cq prefix)
+      int index = columnDef.indexOf(COLON);
+      if (-1 == index) {
+        _cfHolder.set(columnDef);
+        _cqHolder.clear();
+        
+      } else {
+        byte[] cfBytes = columnDef.getBytes();
+        _cfHolder.set(cfBytes, 0, index);
+        _cqHolder.set(cfBytes, index + 1, cfBytes.length - (index + 1)); 
+      }
+    } else {
+      _cfHolder.clear();
+      _cqHolder.clear();
+    }
+    
+    // If we have a column name (this came from a Map)
+    // append that name on the cq.
+    if (null != columnName) {
+      byte[] cnBytes = columnName.getBytes();
+      
+      // CQ is either empty or has a prefix from the columnDef
+      _cqHolder.append(cnBytes, 0, cnBytes.length);
+    }
+    
+    mutation.put(_cfHolder, _cqHolder, columnValue);
   }
 }

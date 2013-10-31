@@ -394,7 +394,14 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   }
   
   protected Text objToText(Object o, byte type) throws IOException {
-    return new Text(objToBytes(o, type));
+    byte[] bytes = objToBytes(o, type);
+    
+    if (null == bytes) {
+      LOG.warn("Creating empty text from null value");
+      return new Text();
+    }
+    
+    return new Text(bytes);
   }
   
   @SuppressWarnings("unchecked")

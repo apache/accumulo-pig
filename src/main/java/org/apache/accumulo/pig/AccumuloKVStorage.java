@@ -44,9 +44,9 @@ import org.apache.pig.data.TupleFactory;
  * provided:</p>
  * 
  * <ul>
- * <li>(key, colfam, colqual, value)</li>
- * <li>(key, colfam, colqual, colvis, value)</li>
- * <li>(key, colfam, colqual, colvis, timestamp, value)</li> 
+ * <li>(row, colfam, colqual, value)</li>
+ * <li>(row, colfam, colqual, colvis, value)</li>
+ * <li>(row, colfam, colqual, colvis, timestamp, value)</li> 
  * </ul>
  */
 public class AccumuloKVStorage extends AbstractAccumuloStorage {
