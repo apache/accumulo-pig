@@ -208,11 +208,16 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
       AccumuloInputFormat.setInputInfo(conf, user, password.getBytes(), table, authorizations);
       AccumuloInputFormat.setZooKeeperInstance(conf, inst, zookeepers);
       if (columnFamilyColumnQualifierPairs.size() > 0) {
-        LOG.debug("columns: " + columnFamilyColumnQualifierPairs);
+        LOG.info("columns: " + columnFamilyColumnQualifierPairs);
         AccumuloInputFormat.fetchColumns(conf, columnFamilyColumnQualifierPairs);
       }
       
-      AccumuloInputFormat.setRanges(conf, Collections.singleton(new Range(start, end)));
+      Collection<Range> ranges = Collections.singleton(new Range(start, end));
+      
+      LOG.info("Scanning Accumulo for " + ranges);
+      
+      AccumuloInputFormat.setRanges(conf, ranges);
+      
       configureInputFormat(conf);
     }
   }
