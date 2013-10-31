@@ -3,6 +3,7 @@ package org.apache.accumulo.pig;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +96,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
           currentEntry = nextEntry;
           
           // Flush and start again
-          InternalMap map = aggregate(aggregate);
+          Map<String,Object> map = aggregate(aggregate);
           tupleEntries.add(map);
           
           aggregate = Lists.newLinkedList();
@@ -110,7 +111,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     
     // and wrap it in a tuple
     Tuple tuple = TupleFactory.getInstance().newTuple(tupleEntries.size() + 1);
-    tuple.set(0, new DataByteArray(key.getRow().getBytes()));
+    tuple.set(0, key.getRow().toString());
     int i = 1;
     for (Object obj : tupleEntries) {
       tuple.set(i, obj);
@@ -120,8 +121,8 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     return tuple;
   }
   
-  private InternalMap aggregate(List<Entry<Key,Value>> columns) {
-    InternalMap map = new InternalMap();
+  private Map<String,Object> aggregate(List<Entry<Key,Value>> columns) {
+    Map<String,Object> map = new HashMap<String,Object>();
     for (Entry<Key,Value> column : columns) {
       map.put(column.getKey().getColumnFamily().toString() + COLON + column.getKey().getColumnQualifier().toString(),
           new DataByteArray(column.getValue().get()));
