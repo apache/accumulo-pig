@@ -121,11 +121,21 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     return tuple;
   }
   
-  private Map<String,Object> aggregate(List<Entry<Key,Value>> columns) {
-    Map<String,Object> map = new HashMap<String,Object>();
+  protected Map<String,Object> aggregate(List<Entry<Key,Value>> columns) {
+    final Map<String,Object> map = new HashMap<String,Object>();
+    final StringBuilder sb = new StringBuilder(128);
+    
     for (Entry<Key,Value> column : columns) {
-      map.put(column.getKey().getColumnFamily().toString() + COLON + column.getKey().getColumnQualifier().toString(),
-          new DataByteArray(column.getValue().get()));
+      String cf = column.getKey().getColumnFamily().toString(), cq = column.getKey().getColumnQualifier().toString();
+      
+      sb.append(cf);
+      if (!cq.isEmpty()) {
+        sb.append(COLON).append(cq);
+      }
+      
+      map.put(sb.toString(), new DataByteArray(column.getValue().get()));
+      
+      sb.setLength(0);
     }
     
     return map;

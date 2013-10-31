@@ -204,7 +204,7 @@ public class AccumuloStorageTest {
       Entry<String,String> key = Maps.immutableEntry(new String(update.getColumnFamily()), new String(update.getColumnQualifier()));
       String value = new String(update.getValue());
       Assert.assertTrue(expectations.containsKey(key));
-     
+      
       String actual = expectations.remove(key);
       Assert.assertEquals(value, actual);
     }
@@ -248,7 +248,7 @@ public class AccumuloStorageTest {
       Entry<String,String> key = Maps.immutableEntry(new String(update.getColumnFamily()), new String(update.getColumnQualifier()));
       String value = new String(update.getValue());
       Assert.assertTrue(expectations.containsKey(key));
-     
+      
       String actual = expectations.remove(key);
       Assert.assertEquals(value, actual);
     }
@@ -292,7 +292,7 @@ public class AccumuloStorageTest {
       Entry<String,String> key = Maps.immutableEntry(new String(update.getColumnFamily()), new String(update.getColumnQualifier()));
       String value = new String(update.getValue());
       Assert.assertTrue(expectations.containsKey(key));
-     
+      
       String actual = expectations.remove(key);
       Assert.assertEquals(value, actual);
     }
@@ -445,6 +445,21 @@ public class AccumuloStorageTest {
     map.put("col3:cq2", new DataByteArray("value2"));
     
     Assert.assertEquals(map, t.get(1));
+  }
+  
+  @Test
+  public void testNoExtraCharsOnAggregate() throws Exception {
+    List<Entry<Key,Value>> input = Arrays.asList(Maps.immutableEntry(new Key("1", "cf1"), new Value("foo".getBytes())),
+        Maps.immutableEntry(new Key("1", "cf2"), new Value("bar".getBytes())));
+    
+    AccumuloStorage storage = new AccumuloStorage();
+    
+    Map<String,Object> aggregate = storage.aggregate(input);
+    
+    Assert.assertTrue(aggregate.containsKey("cf1"));
+    Assert.assertTrue(aggregate.containsKey("cf2"));
+    Assert.assertEquals("foo", aggregate.get("cf1").toString());
+    Assert.assertEquals("bar", aggregate.get("cf2").toString());
   }
   
 }
