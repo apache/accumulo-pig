@@ -204,25 +204,29 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     conf = job.getConfiguration();
     setLocationFromUri(location);
     
-    if (!conf.getBoolean(AccumuloInputFormat.class.getSimpleName() + ".configured", false)) {
-      AccumuloInputFormat.setInputInfo(conf, user, password.getBytes(), table, authorizations);
-      AccumuloInputFormat.setZooKeeperInstance(conf, inst, zookeepers);
-      if (columnFamilyColumnQualifierPairs.size() > 0) {
-        LOG.info("columns: " + columnFamilyColumnQualifierPairs);
-        AccumuloInputFormat.fetchColumns(conf, columnFamilyColumnQualifierPairs);
-      }
-      
-      Collection<Range> ranges = Collections.singleton(new Range(start, end));
-      
-      LOG.info("Scanning Accumulo for " + ranges);
-      
-      AccumuloInputFormat.setRanges(conf, ranges);
-      
-      configureInputFormat(conf);
+    int sequence = AccumuloInputFormat.nextSequence();
+    
+    if (conf.getBoolean(AccumuloInputFormat.class.getSimpleName() + ".configured", false)) {
+      throw new RuntimeException("Was provided sequence number which was already configured: " + sequence);
     }
+    
+    AccumuloInputFormat.setInputInfo(conf, sequence, user, password.getBytes(), table, authorizations);
+    AccumuloInputFormat.setZooKeeperInstance(conf, sequence, inst, zookeepers);
+    if (columnFamilyColumnQualifierPairs.size() > 0) {
+      LOG.info("columns: " + columnFamilyColumnQualifierPairs);
+      AccumuloInputFormat.fetchColumns(conf, sequence, columnFamilyColumnQualifierPairs);
+    }
+    
+    Collection<Range> ranges = Collections.singleton(new Range(start, end));
+    
+    LOG.info("Scanning Accumulo for " + ranges);
+    
+    AccumuloInputFormat.setRanges(conf, sequence, ranges);
+    
+    configureInputFormat(conf, sequence);
   }
   
-  protected void configureInputFormat(Configuration conf) {
+  protected void configureInputFormat(Configuration conf, int sequence) {
     
   }
   

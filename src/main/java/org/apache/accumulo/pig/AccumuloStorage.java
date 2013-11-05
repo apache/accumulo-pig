@@ -141,8 +141,9 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
     return map;
   }
   
-  protected void configureInputFormat(Configuration conf) {
-    AccumuloInputFormat.addIterator(conf, new IteratorSetting(50, WholeRowIterator.class));
+  @Override
+  protected void configureInputFormat(Configuration conf, int sequence) {
+    AccumuloInputFormat.addIterator(conf, sequence, new IteratorSetting(50, WholeRowIterator.class));
   }
   
   @Override
@@ -229,7 +230,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
    */
   protected void addColumn(Mutation mutation, String columnDef, String columnName, Value columnValue) {
     if (null == columnDef && null == columnName) {
-      // TODO Emit a counter here somehow?
+      // TODO Emit a counter here somehow? org.apache.pig.tools.pigstats.PigStatusReporter
       log.warn("Was provided no name or definition for column. Ignoring value");
       return;
     }

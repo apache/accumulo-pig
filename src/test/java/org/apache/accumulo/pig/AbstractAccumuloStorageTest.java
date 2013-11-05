@@ -33,25 +33,32 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.pig.data.Tuple;
+import org.junit.Before;
 import org.junit.Test;
 
 public class AbstractAccumuloStorageTest {
   
-  public Job getExpectedLoadJob(String inst, String zookeepers, String user, String password, String table, String start, String end,
+  @Before
+  public void setup() {
+    AccumuloInputFormat.resetCounters();
+    AccumuloOutputFormat.resetCounters();
+  }
+  
+  public Job getExpectedLoadJob(int sequence, String inst, String zookeepers, String user, String password, String table, String start, String end,
       Authorizations authorizations, List<Pair<Text,Text>> columnFamilyColumnQualifierPairs) throws IOException {
     Collection<Range> ranges = new LinkedList<Range>();
     ranges.add(new Range(start, end));
     
     Job expected = new Job();
     Configuration expectedConf = expected.getConfiguration();
-    AccumuloInputFormat.setInputInfo(expectedConf, user, password.getBytes(), table, authorizations);
-    AccumuloInputFormat.setZooKeeperInstance(expectedConf, inst, zookeepers);
-    AccumuloInputFormat.fetchColumns(expectedConf, columnFamilyColumnQualifierPairs);
-    AccumuloInputFormat.setRanges(expectedConf, ranges);
+    AccumuloInputFormat.setInputInfo(expectedConf, sequence, user, password.getBytes(), table, authorizations);
+    AccumuloInputFormat.setZooKeeperInstance(expectedConf, sequence, inst, zookeepers);
+    AccumuloInputFormat.fetchColumns(expectedConf, sequence, columnFamilyColumnQualifierPairs);
+    AccumuloInputFormat.setRanges(expectedConf, sequence, ranges);
     return expected;
   }
   
-  public Job getDefaultExpectedLoadJob() throws IOException {
+  public Job getDefaultExpectedLoadJob(int sequence) throws IOException {
     String inst = "myinstance";
     String zookeepers = "127.0.0.1:2181";
     String user = "root";
@@ -66,7 +73,7 @@ public class AbstractAccumuloStorageTest {
     columnFamilyColumnQualifierPairs.add(new Pair<Text,Text>(new Text("col2"), new Text("cq2")));
     columnFamilyColumnQualifierPairs.add(new Pair<Text,Text>(new Text("col3"), null));
     
-    Job expected = getExpectedLoadJob(inst, zookeepers, user, password, table, start, end, authorizations, columnFamilyColumnQualifierPairs);
+    Job expected = getExpectedLoadJob(sequence, inst, zookeepers, user, password, table, start, end, authorizations, columnFamilyColumnQualifierPairs);
     return expected;
   }
   
@@ -129,7 +136,7 @@ public class AbstractAccumuloStorageTest {
     s.setLocation(getDefaultLoadLocation(), actual);
     Configuration actualConf = actual.getConfiguration();
     
-    Job expected = getDefaultExpectedLoadJob();
+    Job expected = getDefaultExpectedLoadJob(1);
     Configuration expectedConf = expected.getConfiguration();
     
     TestUtils.assertConfigurationsEqual(expectedConf, actualConf);

@@ -83,8 +83,9 @@ public class AccumuloWholeRowStorage extends AbstractAccumuloStorage {
     return tuple;
   }
   
-  protected void configureInputFormat(Configuration conf) {
-    AccumuloInputFormat.addIterator(conf, new IteratorSetting(50, WholeRowIterator.class));
+  @Override
+  protected void configureInputFormat(Configuration conf, int sequence) {
+    AccumuloInputFormat.addIterator(conf, sequence, new IteratorSetting(50, WholeRowIterator.class));
   }
   
   @Override
