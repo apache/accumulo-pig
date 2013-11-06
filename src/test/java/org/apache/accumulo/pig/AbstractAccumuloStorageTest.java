@@ -77,20 +77,20 @@ public class AbstractAccumuloStorageTest {
     return expected;
   }
   
-  public Job getExpectedStoreJob(String inst, String zookeepers, String user, String password, String table, long maxWriteBufferSize, int writeThreads,
+  public Job getExpectedStoreJob(int sequence, String inst, String zookeepers, String user, String password, String table, long maxWriteBufferSize, int writeThreads,
       int maxWriteLatencyMS) throws IOException {
     Job expected = new Job();
     Configuration expectedConf = expected.getConfiguration();
-    AccumuloOutputFormat.setOutputInfo(expectedConf, user, password.getBytes(), true, table);
-    AccumuloOutputFormat.setZooKeeperInstance(expectedConf, inst, zookeepers);
-    AccumuloOutputFormat.setMaxLatency(expectedConf, maxWriteLatencyMS);
-    AccumuloOutputFormat.setMaxMutationBufferSize(expectedConf, maxWriteBufferSize);
-    AccumuloOutputFormat.setMaxWriteThreads(expectedConf, writeThreads);
+    AccumuloOutputFormat.setOutputInfo(expectedConf, sequence,user, password.getBytes(), true, table);
+    AccumuloOutputFormat.setZooKeeperInstance(expectedConf, sequence,inst, zookeepers);
+    AccumuloOutputFormat.setMaxLatency(expectedConf, sequence,maxWriteLatencyMS);
+    AccumuloOutputFormat.setMaxMutationBufferSize(expectedConf, sequence,maxWriteBufferSize);
+    AccumuloOutputFormat.setMaxWriteThreads(expectedConf, sequence,writeThreads);
     
     return expected;
   }
   
-  public Job getDefaultExpectedStoreJob() throws IOException {
+  public Job getDefaultExpectedStoreJob(int sequence) throws IOException {
     String inst = "myinstance";
     String zookeepers = "127.0.0.1:2181";
     String user = "root";
@@ -100,7 +100,7 @@ public class AbstractAccumuloStorageTest {
     int writeThreads = 7;
     int maxWriteLatencyMS = 30000;
     
-    Job expected = getExpectedStoreJob(inst, zookeepers, user, password, table, maxWriteBufferSize, writeThreads, maxWriteLatencyMS);
+    Job expected = getExpectedStoreJob(sequence, inst, zookeepers, user, password, table, maxWriteBufferSize, writeThreads, maxWriteLatencyMS);
     return expected;
   }
   
@@ -150,7 +150,7 @@ public class AbstractAccumuloStorageTest {
     s.setStoreLocation(getDefaultStoreLocation(), actual);
     Configuration actualConf = actual.getConfiguration();
     
-    Job expected = getDefaultExpectedStoreJob();
+    Job expected = getDefaultExpectedStoreJob(1);
     Configuration expectedConf = expected.getConfiguration();
     
     TestUtils.assertConfigurationsEqual(expectedConf, actualConf);

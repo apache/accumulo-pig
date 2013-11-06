@@ -94,7 +94,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   int maxWriteThreads = 10;
   long maxMutationBufferSize = 10 * 1000 * 1000;
   int maxLatency = 10 * 1000;
-
+  
   protected LoadStoreCaster caster;
   protected ResourceSchema schema;
   protected String contextSignature = null;
@@ -206,8 +206,11 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     
     int sequence = AccumuloInputFormat.nextSequence();
     
-    if (conf.getBoolean(AccumuloInputFormat.class.getSimpleName() + ".configured", false)) {
-      throw new RuntimeException("Was provided sequence number which was already configured: " + sequence);
+    // TODO Something more.. "certain".
+    if (conf.getBoolean(AccumuloInputFormat.class.getSimpleName() + ".configured." + sequence, false)) {
+      LOG.warn("InputFormat already configured for " + sequence);
+      return;
+      // throw new RuntimeException("Was provided sequence number which was already configured: " + sequence);
     }
     
     AccumuloInputFormat.setInputInfo(conf, sequence, user, password.getBytes(), table, authorizations);
@@ -248,7 +251,8 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   public void setStoreFuncUDFContextSignature(String signature) {
     this.contextSignature = signature;
     
-  }  
+  }
+  
   /**
    * Returns UDFProperties based on <code>contextSignature</code>.
    */
@@ -264,14 +268,22 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     conf = job.getConfiguration();
     setLocationFromUri(location);
     
-    if (!conf.getBoolean(AccumuloOutputFormat.class.getSimpleName() + ".configured", false)) {
-      AccumuloOutputFormat.setOutputInfo(conf, user, password.getBytes(), true, table);
-      AccumuloOutputFormat.setZooKeeperInstance(conf, inst, zookeepers);
-      AccumuloOutputFormat.setMaxLatency(conf, maxLatency);
-      AccumuloOutputFormat.setMaxMutationBufferSize(conf, maxMutationBufferSize);
-      AccumuloOutputFormat.setMaxWriteThreads(conf, maxWriteThreads);
-      configureOutputFormat(conf);
+    int sequence = AccumuloOutputFormat.nextSequence();
+    
+    // TODO Something more.. "certain".
+    if (conf.getBoolean(AccumuloOutputFormat.class.getSimpleName() + ".configured." + sequence, false)) {
+      LOG.warn("OutputFormat already configured for " + sequence);
+      return;
+      // throw new RuntimeException("Was provided sequence number which was already configured: " + sequence);
     }
+    
+    AccumuloOutputFormat.setOutputInfo(conf, sequence, user, password.getBytes(), true, table);
+    AccumuloOutputFormat.setZooKeeperInstance(conf, sequence, inst, zookeepers);
+    AccumuloOutputFormat.setMaxLatency(conf, sequence, maxLatency);
+    AccumuloOutputFormat.setMaxMutationBufferSize(conf, sequence, maxMutationBufferSize);
+    AccumuloOutputFormat.setMaxWriteThreads(conf, sequence, maxWriteThreads);
+    
+    configureOutputFormat(conf);
   }
   
   @SuppressWarnings("rawtypes")
@@ -298,7 +310,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   }
   
   public void cleanupOnFailure(String failure, Job job) {}
-
+  
   public void cleanupOnSuccess(String location, Job job) {}
   
   @Override
@@ -310,7 +322,6 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     schema = s;
     getUDFProperties().setProperty(contextSignature + "_schema", ObjectSerializer.serialize(schema));
   }
-
   
   protected Text tupleToText(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException {
     Object o = tuple.get(i);
@@ -341,7 +352,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     
   }
   
-  protected long objToLong(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException { 
+  protected long objToLong(Tuple tuple, int i, ResourceFieldSchema[] fieldSchemas) throws IOException {
     Object o = tuple.get(i);
     byte type = schemaToType(o, i, fieldSchemas);
     
