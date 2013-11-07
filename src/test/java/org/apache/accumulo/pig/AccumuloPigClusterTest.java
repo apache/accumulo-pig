@@ -10,8 +10,6 @@ import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.Connector;
 import org.apache.accumulo.core.client.ZooKeeperInstance;
 import org.apache.accumulo.core.client.admin.TableOperations;
-import org.apache.accumulo.core.client.mapreduce.AccumuloInputFormat;
-import org.apache.accumulo.core.client.mapreduce.AccumuloOutputFormat;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.minicluster.MiniAccumuloCluster;
 import org.apache.accumulo.minicluster.MiniAccumuloConfig;
@@ -54,8 +52,6 @@ public class AccumuloPigClusterTest {
   
   @Before
   public void beforeTest() throws Exception {
-    AccumuloInputFormat.resetCounters();
-    AccumuloOutputFormat.resetCounters();
     pig = new PigServer(ExecType.LOCAL, conf);
   }
   

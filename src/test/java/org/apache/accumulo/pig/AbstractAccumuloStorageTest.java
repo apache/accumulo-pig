@@ -33,24 +33,18 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.pig.data.Tuple;
-import org.junit.Before;
 import org.junit.Test;
 
 public class AbstractAccumuloStorageTest {
   
-  @Before
-  public void setup() {
-    AccumuloInputFormat.resetCounters();
-    AccumuloOutputFormat.resetCounters();
-  }
-  
-  public Job getExpectedLoadJob(int sequence, String inst, String zookeepers, String user, String password, String table, String start, String end,
+  public Job getExpectedLoadJob(String inst, String zookeepers, String user, String password, String table, String start, String end,
       Authorizations authorizations, List<Pair<Text,Text>> columnFamilyColumnQualifierPairs) throws IOException {
     Collection<Range> ranges = new LinkedList<Range>();
     ranges.add(new Range(start, end));
     
     Job expected = new Job();
     Configuration expectedConf = expected.getConfiguration();
+    final int sequence = AccumuloInputFormat.nextSequence(expectedConf);
     AccumuloInputFormat.setInputInfo(expectedConf, sequence, user, password.getBytes(), table, authorizations);
     AccumuloInputFormat.setZooKeeperInstance(expectedConf, sequence, inst, zookeepers);
     AccumuloInputFormat.fetchColumns(expectedConf, sequence, columnFamilyColumnQualifierPairs);
@@ -58,7 +52,7 @@ public class AbstractAccumuloStorageTest {
     return expected;
   }
   
-  public Job getDefaultExpectedLoadJob(int sequence) throws IOException {
+  public Job getDefaultExpectedLoadJob() throws IOException {
     String inst = "myinstance";
     String zookeepers = "127.0.0.1:2181";
     String user = "root";
@@ -73,14 +67,15 @@ public class AbstractAccumuloStorageTest {
     columnFamilyColumnQualifierPairs.add(new Pair<Text,Text>(new Text("col2"), new Text("cq2")));
     columnFamilyColumnQualifierPairs.add(new Pair<Text,Text>(new Text("col3"), null));
     
-    Job expected = getExpectedLoadJob(sequence, inst, zookeepers, user, password, table, start, end, authorizations, columnFamilyColumnQualifierPairs);
+    Job expected = getExpectedLoadJob(inst, zookeepers, user, password, table, start, end, authorizations, columnFamilyColumnQualifierPairs);
     return expected;
   }
   
-  public Job getExpectedStoreJob(int sequence, String inst, String zookeepers, String user, String password, String table, long maxWriteBufferSize, int writeThreads,
+  public Job getExpectedStoreJob(String inst, String zookeepers, String user, String password, String table, long maxWriteBufferSize, int writeThreads,
       int maxWriteLatencyMS) throws IOException {
     Job expected = new Job();
     Configuration expectedConf = expected.getConfiguration();
+    final int sequence = AccumuloOutputFormat.nextSequence(expectedConf);
     AccumuloOutputFormat.setOutputInfo(expectedConf, sequence,user, password.getBytes(), true, table);
     AccumuloOutputFormat.setZooKeeperInstance(expectedConf, sequence,inst, zookeepers);
     AccumuloOutputFormat.setMaxLatency(expectedConf, sequence,maxWriteLatencyMS);
@@ -90,7 +85,7 @@ public class AbstractAccumuloStorageTest {
     return expected;
   }
   
-  public Job getDefaultExpectedStoreJob(int sequence) throws IOException {
+  public Job getDefaultExpectedStoreJob() throws IOException {
     String inst = "myinstance";
     String zookeepers = "127.0.0.1:2181";
     String user = "root";
@@ -100,7 +95,7 @@ public class AbstractAccumuloStorageTest {
     int writeThreads = 7;
     int maxWriteLatencyMS = 30000;
     
-    Job expected = getExpectedStoreJob(sequence, inst, zookeepers, user, password, table, maxWriteBufferSize, writeThreads, maxWriteLatencyMS);
+    Job expected = getExpectedStoreJob(inst, zookeepers, user, password, table, maxWriteBufferSize, writeThreads, maxWriteLatencyMS);
     return expected;
   }
   
@@ -136,7 +131,7 @@ public class AbstractAccumuloStorageTest {
     s.setLocation(getDefaultLoadLocation(), actual);
     Configuration actualConf = actual.getConfiguration();
     
-    Job expected = getDefaultExpectedLoadJob(1);
+    Job expected = getDefaultExpectedLoadJob();
     Configuration expectedConf = expected.getConfiguration();
     
     TestUtils.assertConfigurationsEqual(expectedConf, actualConf);
@@ -150,7 +145,7 @@ public class AbstractAccumuloStorageTest {
     s.setStoreLocation(getDefaultStoreLocation(), actual);
     Configuration actualConf = actual.getConfiguration();
     
-    Job expected = getDefaultExpectedStoreJob(1);
+    Job expected = getDefaultExpectedStoreJob();
     Configuration expectedConf = expected.getConfiguration();
     
     TestUtils.assertConfigurationsEqual(expectedConf, actualConf);
