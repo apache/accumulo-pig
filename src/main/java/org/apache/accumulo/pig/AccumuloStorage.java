@@ -73,7 +73,7 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   
   @Override
   protected Tuple getTuple(Key key, Value value) throws IOException {
-    
+//    System.out.println(key);
     SortedMap<Key,Value> rowKVs = WholeRowIterator.decodeRow(key, value);
     
     List<Object> tupleEntries = Lists.newLinkedList();
@@ -142,8 +142,8 @@ public class AccumuloStorage extends AbstractAccumuloStorage {
   }
   
   @Override
-  protected void configureInputFormat(Configuration conf, int sequence) {
-    AccumuloInputFormat.addIterator(conf, sequence, new IteratorSetting(50, WholeRowIterator.class));
+  protected void configureInputFormat(Configuration conf) {
+    AccumuloInputFormat.addIterator(conf, new IteratorSetting(50, WholeRowIterator.class));
   }
   
   @Override

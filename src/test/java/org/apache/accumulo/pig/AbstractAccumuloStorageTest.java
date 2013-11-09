@@ -44,11 +44,10 @@ public class AbstractAccumuloStorageTest {
     
     Job expected = new Job();
     Configuration expectedConf = expected.getConfiguration();
-    final int sequence = AccumuloInputFormat.nextSequence(expectedConf);
-    AccumuloInputFormat.setInputInfo(expectedConf, sequence, user, password.getBytes(), table, authorizations);
-    AccumuloInputFormat.setZooKeeperInstance(expectedConf, sequence, inst, zookeepers);
-    AccumuloInputFormat.fetchColumns(expectedConf, sequence, columnFamilyColumnQualifierPairs);
-    AccumuloInputFormat.setRanges(expectedConf, sequence, ranges);
+    AccumuloInputFormat.setInputInfo(expectedConf, user, password.getBytes(), table, authorizations);
+    AccumuloInputFormat.setZooKeeperInstance(expectedConf, inst, zookeepers);
+    AccumuloInputFormat.fetchColumns(expectedConf, columnFamilyColumnQualifierPairs);
+    AccumuloInputFormat.setRanges(expectedConf, ranges);
     return expected;
   }
   
@@ -75,12 +74,11 @@ public class AbstractAccumuloStorageTest {
       int maxWriteLatencyMS) throws IOException {
     Job expected = new Job();
     Configuration expectedConf = expected.getConfiguration();
-    final int sequence = AccumuloOutputFormat.nextSequence(expectedConf);
-    AccumuloOutputFormat.setOutputInfo(expectedConf, sequence,user, password.getBytes(), true, table);
-    AccumuloOutputFormat.setZooKeeperInstance(expectedConf, sequence,inst, zookeepers);
-    AccumuloOutputFormat.setMaxLatency(expectedConf, sequence,maxWriteLatencyMS);
-    AccumuloOutputFormat.setMaxMutationBufferSize(expectedConf, sequence,maxWriteBufferSize);
-    AccumuloOutputFormat.setMaxWriteThreads(expectedConf, sequence,writeThreads);
+    AccumuloOutputFormat.setOutputInfo(expectedConf, user, password.getBytes(), true, table);
+    AccumuloOutputFormat.setZooKeeperInstance(expectedConf, inst, zookeepers);
+    AccumuloOutputFormat.setMaxLatency(expectedConf, maxWriteLatencyMS);
+    AccumuloOutputFormat.setMaxMutationBufferSize(expectedConf, maxWriteBufferSize);
+    AccumuloOutputFormat.setMaxWriteThreads(expectedConf, writeThreads);
     
     return expected;
   }
