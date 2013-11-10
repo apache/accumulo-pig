@@ -41,7 +41,7 @@ div#content {
     border-top-style: none;
 }
 
-pre.codepre { 
+pre.code { 
     overflow: auto;
     padding-left: 20px;
     padding-top: 15px;

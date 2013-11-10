@@ -8,3 +8,4 @@ pygments: true
 auto: true
 baseurl: /
 permalinks: pretty
+relative_permalinks: false
