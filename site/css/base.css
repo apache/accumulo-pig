@@ -3,6 +3,22 @@ body {
     margin: 0;
 
     background-color: #D0D0D0;
+    min-width: 1200px;
+    margin-bottom: 50px;
+}
+
+div#header {
+    overflow: hidden; 
+}
+
+div#header span.h1 {
+    vertical-align: center;
+    line-height: 75px;
+}
+
+span.h1 {
+    font-size: 36px;
+    font-weight: bold;
 }
 
 div#content {
@@ -12,6 +28,7 @@ div#content {
     padding-top: 15px;
     padding-left: 75px;
     padding-right: 75px;
+    padding-bottom: 25px;
 
     outline: 0;
 
