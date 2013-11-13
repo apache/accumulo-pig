@@ -97,6 +97,7 @@ public class AccumuloKVStorage extends AbstractAccumuloStorage {
       }
     } else {
       if (6 < tuple.size()) {
+        // TODO Add a counter as a warning.
         LOG.debug("Ignoring additional entries in tuple of length " + tuple.size());
       }
       
