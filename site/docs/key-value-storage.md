@@ -75,4 +75,4 @@ row1 colfam_1:colqual_1 [column_vis] timestamp value
 
 Overall, this provides a much lower-level support that may be of use in specific applications which already have data
 stored in Accumulo tables. An end-to-end example can provide some basic insight to [what is currently
-possible](/docs/flight-example).
+possible]({{site.url}}/docs/flight-example).

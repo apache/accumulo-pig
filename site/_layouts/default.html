@@ -5,7 +5,7 @@
         <title>{{ page.title }}</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-        <link href="/css/base.css" rel="stylesheet" type="text/css" />
+        <link href="{{ site.url }}/css/base.css" rel="stylesheet" type="text/css" />
 
         <!--script type="text/javascript">
             var _gaq = _gaq || [];
@@ -25,7 +25,7 @@
         <div id="content">
             <div id="header">
                 <span class="h1">{% if page.title %} {{ page.title }} {% else %} Accumulo storage with Pig {% endif %}</span>
-                <span style="float:right;"><img src="/images/pig.gif" height="70px" alt="pig" /><img src="/images/accumulo.png" height="70px" alt="accumulo" style="padding-left:15px"/></span>
+                <span style="float:right;"><img src="{{ site.url }}/images/pig.gif" height="70px" alt="pig" /><img src="{{ site.url }}/images/accumulo.png" height="70px" alt="accumulo" style="padding-left:15px"/></span>
             </div>
             {{ content }}
         </div>

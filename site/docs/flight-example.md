@@ -135,3 +135,5 @@ pig@accumulo flights_with_airports> scan
 2000-01-01_AA_10 taxi_in: []    8
 2000-01-01_AA_10 taxi_out: []    17
 </pre>
+
+Considerations on [future work]({{site.url}}/docs/future-work).

@@ -1,8 +1,8 @@
 name: "Accumulo-Pig"
 description: "Using Apache Accumulo as a storage engine for Apache Pig"
 
-#url: http://people.apache.org/~elserj/accumulo-pig/
-url: http://localhost:4000
+url: http://people.apache.org/~elserj/accumulo-pig/
+#url: http://localhost:4000
 
 pygments: true
 auto: true

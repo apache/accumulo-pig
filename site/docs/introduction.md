@@ -52,4 +52,4 @@ In addition to the trivial "map in row" layout, more advanced table schemas exis
 document-partitioned indexes, and edge lists to name a few. All of these can be expressed using the same "5 tuple" Key
 data model that Accumulo provides.
 
-Next, how to [use Pig to manipulate "map in row" datasets in Accumulo](/docs/map-storage).
+Next, how to [use Pig to manipulate "map in row" datasets in Accumulo]({{site.url}}/docs/map-storage).

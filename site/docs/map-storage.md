@@ -160,4 +160,4 @@ And, with a column mapping of "information:person\_":
 </table>
 
 In addition to dealing with data in this row with columns approach, you can also treat read/write data from Accumulo
-with Pig in terms of [keys and values](/docs/key-value-storage).
+with Pig in terms of [keys and values]({{site.url}}/docs/key-value-storage).
