@@ -49,13 +49,13 @@ composed of the column qualifier and each map will be the collection of each col
 By default will generate a tuple of the following:
 
 <pre class="code">
-("1", {"measurements:height"#"72inches", "measurements:weight"#"180lbs", "location:city"#"San Francisco", "location:state"#"California"})
+(1, [measurements:height#72inches, measurements:weight#180lbs, location:city#San Francisco, location:state#California])
 </pre>
 
 If the previously mentioned boolean argument is provided as true, the following will be generated instead:
 
 <pre class="code">
-("1", {"measurements:height"#"72inches", "measurements:weight"#"180lbs"}, {"location:city"#"San Francisco", "location:state"#"California"})
+(1, [measurements:height#72inches, measurements:weight#180lbs], [location:city#San Francisco, location:state#California])
 </pre>
 
 ## Writing
@@ -68,71 +68,96 @@ Some basic Accumulo write parameters are exposed for use. Like read operations, 
 * `write_latency_ms` - The number of milliseconds to wait before forcibly flushing Mutations to Accumulo. **Default:
 10,000 (10 seconds)**.
 
+The _AccumuloStorage_ class can accept data in a few different formats. A String argument may be provided to the
+_AccumuloStorage_ constructor to provide a column mapping which is a comma-separated list (this will be touched on
+later). One thing that is universal is that the first entry in the tuple is treated as the rowkey and must be
+castable to a _chararray_. For elements 1 through _N_ in a Tuple, the two cases may apply.
+
 ### Data as map
+
+When the Tuple entry is a map, we can naturally treat it as a column to value mapping, placing the map key in the column
+family and the map value in the Accumulo value. When a non-empty value from the column mapping provided in the
+_AccumuloStorage_ constructor is present, we will use the _N_th value in that CSV as a column family for this _N_th
+entry in the Tuple and the map key is placed in the qualifier.
+
+If the entry from the column mapping happens to contain a colon, _AccumuloStorage_ will split the key on the colon. In
+the case where the colon is present, the characters following the colon in the column mapping entry will be placed in
+the column qualifier with the map key being append to it.
+
+Concretely, let's say we have the following Tuple:
+
+<pre class="code">
+(1, [height#72inches, weight#180lbs, city#San Francisco, state#California])
+</pre>
+
+With an empty (or null) column mapping, _AccumuloStorage_ will generate the following Key-Value pairs:
+
+<table border="1">
+    <tr><th>Row</th><th>ColumnFamily</th><th>ColumnQualifier</th><th>Value</th></tr>
+    <tr><td>1</td><td>height</td><td></td><td>72inches</td></tr>
+    <tr><td>1</td><td>weight</td><td></td><td>180lbs</td></tr>
+    <tr><td>1</td><td>city</td><td></td><td>San Francisco</td></tr>
+    <tr><td>1</td><td>state</td><td></td><td>California</td></tr>
+</table>
+
+With a column mapping of "information":
+
+<table border="1">
+    <tr><th>Row</th><th>ColumnFamily</th><th>ColumnQualifier</th><th>Value</th></tr>
+    <tr><td>1</td><td>information</td><td>height</td><td>72inches</td></tr>
+    <tr><td>1</td><td>information</td><td>weight</td><td>180lbs</td></tr>
+    <tr><td>1</td><td>information</td><td>city</td><td>San Francisco</td></tr>
+    <tr><td>1</td><td>information</td><td>state</td><td>California</td></tr>
+</table>
+
+And, with a column mapping of "information:person\_":
+
+<table border="1">
+    <tr><th>Row</th><th>ColumnFamily</th><th>ColumnQualifier</th><th>Value</th></tr>
+    <tr><td>1</td><td>information</td><td>person_height</td><td>72inches</td></tr>
+    <tr><td>1</td><td>information</td><td>person_weight</td><td>180lbs</td></tr>
+    <tr><td>1</td><td>information</td><td>person_city</td><td>San Francisco</td></tr>
+    <tr><td>1</td><td>information</td><td>person_state</td><td>California</td></tr>
+</table>
 
 ### Data as fields 
 
+When an entry in the Tuple is not a map, we require a non-empty column mapping to use in coordination with the current
+field. The same colon-delimiter logic that was described when handling a Map in a tuple applies with other fields.
+
 <pre class="code">
-<span class="comment">-- Read a reduced set of our flight data</span>
-<span class="variable">flight_data</span> = <span class="keyword">LOAD</span> <span class="constants">'accumulo://flights?instance=accumulo&amp;user=pig&amp;password=password&amp;zookeepers=localhost&amp;fetch_columns=destination,departure_time,scheduled_departure_time,flight_number,taxi_in,taxi_out,origin'</span>
-<span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage() <span class="keyword">AS</span> (rowkey:<span class="type">chararray</span>, data:<span class="type">map[]</span>);
-
-<span class="comment">-- Also read airport information</span>
-<span class="variable">airports</span> = <span class="keyword">LOAD</span> <span class="constants">'accumulo://airports?instance=accumulo&amp;user=pig&amp;password=password&amp;zookeepers=localhost'</span> <span class="keyword">USING</span>
-org.apache.accumulo.pig.AccumuloStorage() <span class="keyword">AS</span> (rowkey:<span class="type">chararray</span>, data:<span class="type">map[]</span>);
-
-<span class="comment">-- Permute the map</span>
-<span class="variable">flight_data</span> = <span class="keyword">FOREACH</span> <span class="variable">flight_data</span> <span class="keyword">GENERATE</span> rowkey, data#<span class="constants">'origin'</span> <span class="keyword">AS</span> origin, data#<span class="constants">'destination'</span> <span class="keyword">AS</span> destination, data#<span class="constants">'departure_time'</span> <span class="keyword">AS</span> departure_time,
-data#<span class="constants">'scheduled_departure_time'</span> <span class="keyword">AS</span> scheduled_departure_time, data#<span class="constants">'flight_number'</span> <span class="keyword">AS</span> flight_number, data#<span class="constants">'taxi_in'</span> <span class="keyword">AS</span> taxi_in, data#<span class="constants">'taxi_out'</span> <span class="keyword">AS</span> taxi_out;
-
-<span class="comment">-- Permute the map</span>
-<span class="variable">airports</span> = <span class="keyword">FOREACH</span> <span class="variable">airports</span> <span class="keyword">GENERATE</span> data#<span class="constants">'name'</span> <span class="keyword">AS</span> name, data#<span class="constants">'state'</span> <span class="keyword">AS</span> state, data#<span class="constants">'code'</span> <span class="keyword">AS</span> code, data#<span class="constants">'country'</span> <span class="keyword">AS</span> country, data#<span class="constants">'city'</span> <span class="keyword">AS</span> city;
-
-<span class="comment">-- Add airport information about the origin of the flight</span>
-<span class="variable">flights_with_origin</span> = <span class="keyword">JOIN</span> <span class="variable">flight_data</span> <span class="keyword">BY</span> origin, <span class="variable">airports</span> <span class="keyword">BY</span> code;
-
-<span class="comment">-- Store this information back into Accumulo in a new table</span>
-<span class="keyword">STORE</span> <span class="variable">flights_with_origin</span> <span class="keyword">INTO</span> <span class="constants">'accumulo://flights_with_airports?instance=accumulo1.4&amp;user=root&amp;password=secret&amp;zookeepers=localhost'</span> \
-<span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage(<span class="constants">'origin,destination,departure_time,scheduled_departure_time,flight_number,taxi_in,taxi_out,name,state,code,country,city'</span>);
+(1, 72inches, 180lbs, San Francisco, California)
 </pre>
 
-<p> Vestibulum vulputate nisi non imperdiet elementum. Pellentesque at
-consequat nisi. Fusce ut luctus justo. Aenean tincidunt ut risus
-condimentum convallis. Praesent eget tristique risus. Cras pellentesque sed
-libero ac elementum. Quisque tempus commodo neque, laoreet accumsan lectus
-sollicitudin eget. In convallis neque nisi, a iaculis neque interdum ac.
-Suspendisse in ante lacinia dolor faucibus auctor.
-</p>
+With an empty (or null) column mapping, _AccumuloStorage_ will generate the following Key-Value pairs:
 
-<p>Nulla fringilla quis turpis a gravida. Quisque tellus arcu, sagittis et sapien
-ut, imperdiet scelerisque est. Duis sapien mi, elementum vitae sem quis, varius
-tincidunt tortor. In commodo semper magna. Donec ultrices nunc est, nec
-volutpat leo porta scelerisque. Praesent tellus leo, scelerisque eget tortor
-eget, posuere sodales nulla. Mauris imperdiet magna eget tristique consequat.
-Nullam adipiscing at arcu in vestibulum. Donec consectetur justo sed odio
-vehicula, vel lobortis libero vehicula. Fusce rutrum justo lorem, sed bibendum
-ipsum ultrices eget. Praesent lobortis justo quis sem adipiscing rutrum ac eget
-nisi. Pellentesque et justo in leo rutrum rhoncus a ut neque. Fusce faucibus,
-orci nec venenatis dapibus, est leo ornare eros, ac adipiscing erat felis sit
-amet tellus. Nulla vehicula ipsum sit amet accumsan tempor.
-</p>
+<table border="1">
+    <tr><th>Row</th><th>ColumnFamily</th><th>ColumnQualifier</th><th>Value</th></tr>
+    <tr><td>1</td><td>height</td><td></td><td>72inches</td></tr>
+    <tr><td>1</td><td>weight</td><td></td><td>180lbs</td></tr>
+    <tr><td>1</td><td>city</td><td></td><td>San Francisco</td></tr>
+    <tr><td>1</td><td>state</td><td></td><td>California</td></tr>
+</table>
 
-<p>Nulla ac est tincidunt, lacinia quam nec, mollis ante. Nulla ut tincidunt
-massa, vel laoreet elit. Aliquam erat volutpat. Mauris varius dolor in eros
-blandit adipiscing. Nam ultrices tellus quam, eu porta quam varius ac.
-Phasellus in massa fringilla, mattis nisi vel, condimentum diam. Cras porttitor
-eget arcu vel tempor.
-</p>
+With a column mapping of "information":
 
-<p>Ut id vestibulum lorem. Fusce vitae metus sed magna tincidunt vestibulum. Fusce
-in eros ac nulla vestibulum venenatis vitae vitae nisi. Donec elementum neque
-ac viverra cursus. Morbi tincidunt venenatis tellus, id facilisis nibh viverra
-eget. Aenean pellentesque gravida orci, sed elementum nisl vulputate at.
-Suspendisse ut orci vitae tortor viverra egestas id scelerisque ante. Praesent
-vel tempor justo, id tempor lacus. Proin convallis vehicula mauris. Suspendisse
-tincidunt et libero vitae condimentum. Nam arcu urna, sollicitudin nec diam
-congue, ultricies hendrerit mi. Vivamus viverra elit in libero rutrum commodo.
-Ut eget varius arcu, ac venenatis tellus. Quisque rutrum blandit velit in
-sollicitudin. Maecenas nibh purus, consectetur at elementum at, dictum et
-dolor. 
-</p>
+<table border="1">
+    <tr><th>Row</th><th>ColumnFamily</th><th>ColumnQualifier</th><th>Value</th></tr>
+    <tr><td>1</td><td>information</td><td>height</td><td>72inches</td></tr>
+    <tr><td>1</td><td>information</td><td>weight</td><td>180lbs</td></tr>
+    <tr><td>1</td><td>information</td><td>city</td><td>San Francisco</td></tr>
+    <tr><td>1</td><td>information</td><td>state</td><td>California</td></tr>
+</table>
+
+And, with a column mapping of "information:person\_":
+
+<table border="1">
+    <tr><th>Row</th><th>ColumnFamily</th><th>ColumnQualifier</th><th>Value</th></tr>
+    <tr><td>1</td><td>information</td><td>person_height</td><td>72inches</td></tr>
+    <tr><td>1</td><td>information</td><td>person_weight</td><td>180lbs</td></tr>
+    <tr><td>1</td><td>information</td><td>person_city</td><td>San Francisco</td></tr>
+    <tr><td>1</td><td>information</td><td>person_state</td><td>California</td></tr>
+</table>
+
+In addition to dealing with data in this row with columns approach, you can also treat read/write data from Accumulo
+with Pig in terms of [keys and values](/docs/key-value-storage).
