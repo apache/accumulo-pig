@@ -1,71 +1,55 @@
 ---
-layout: default
-title: Accumulo Storage with Pig
+layout: docs
+title: Introduction
 permalink: /docs/introduction/
 ---
-[Apache Accumulo](http://accumulo.apache.org) 
+## Pig 
 
-<pre class="code">
-<span class="comment">-- Read a reduced set of our flight data</span>
-<span class="variable">flight_data</span> = <span class="keyword">LOAD</span> <span class="constants">'accumulo://flights?instance=accumulo&amp;user=pig&amp;password=password&amp;zookeepers=localhost&amp;fetch_columns=destination,departure_time,scheduled_departure_time,flight_number,taxi_in,taxi_out,origin'</span>
-<span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage() <span class="keyword">AS</span> (rowkey:<span class="type">chararray</span>, data:<span class="type">map[]</span>);
+One of the big reasons that [Apache Pig](http://pig.apache.org) exists is to provide a much lower-cost entry point to
+running MapReduce. Writing a MapReduce job typically ends up being expression in hundreds of lines of code to solve
+problems that are often categorized as [embarrassingly parallel](http://en.wikipedia.org/wiki/Embarrassingly_parallel).
+As such, these problems are typically easy to think about conceptually and can be used as a point of introspection to a
+data set or combination of data sets. Thus, it doesn't make sense to write large amounts of Java code for what may be
+repeated one-off questions.
 
-<span class="comment">-- Also read airport information</span>
-<span class="variable">airports</span> = <span class="keyword">LOAD</span> <span class="constants">'accumulo://airports?instance=accumulo&amp;user=pig&amp;password=password&amp;zookeepers=localhost'</span> <span class="keyword">USING</span>
-org.apache.accumulo.pig.AccumuloStorage() <span class="keyword">AS</span> (rowkey:<span class="type">chararray</span>, data:<span class="type">map[]</span>);
+## Accumulo
 
-<span class="comment">-- Permute the map</span>
-<span class="variable">flight_data</span> = <span class="keyword">FOREACH</span> <span class="variable">flight_data</span> <span class="keyword">GENERATE</span> rowkey, data#<span class="constants">'origin'</span> <span class="keyword">AS</span> origin, data#<span class="constants">'destination'</span> <span class="keyword">AS</span> destination, data#<span class="constants">'departure_time'</span> <span class="keyword">AS</span> departure_time,
-data#<span class="constants">'scheduled_departure_time'</span> <span class="keyword">AS</span> scheduled_departure_time, data#<span class="constants">'flight_number'</span> <span class="keyword">AS</span> flight_number, data#<span class="constants">'taxi_in'</span> <span class="keyword">AS</span> taxi_in, data#<span class="constants">'taxi_out'</span> <span class="keyword">AS</span> taxi_out;
+Accumulo is one of many storage solutions in the Apache Hadoop ecosystem, so it makes sense that Pig should also be able
+to read/write data from/to Accumulo. Very similar to [Apache HBase](http://hbase.apache.org), Accumulo is a Key-Value datastore,
+where a Key is made up of [multiple parts](http://accumulo.apache.org/1.5/accumulo_user_manual.html#_data_model). 
 
-<span class="comment">-- Permute the map</span>
-<span class="variable">airports</span> = <span class="keyword">FOREACH</span> <span class="variable">airports</span> <span class="keyword">GENERATE</span> data#<span class="constants">'name'</span> <span class="keyword">AS</span> name, data#<span class="constants">'state'</span> <span class="keyword">AS</span> state, data#<span class="constants">'code'</span> <span class="keyword">AS</span> code, data#<span class="constants">'country'</span> <span class="keyword">AS</span> country, data#<span class="constants">'city'</span> <span class="keyword">AS</span> city;
+![Data Model](/images/accumulo-data-model.png)
 
-<span class="comment">-- Add airport information about the origin of the flight</span>
-<span class="variable">flights_with_origin</span> = <span class="keyword">JOIN</span> <span class="variable">flight_data</span> <span class="keyword">BY</span> origin, <span class="variable">airports</span> <span class="keyword">BY</span> code;
+This data model lends itself well to working with columnar data, handling changing, sparse column definitions on the fly. As
+new columns are created, Accumulo can process these automatically without any user intevention. Many columns can exist
+across many rows, and rows can contain different sets of columns. This can be thought of as storing a Map of data in
+each row.
 
-<span class="comment">-- Store this information back into Accumulo in a new table</span>
-<span class="keyword">STORE</span> <span class="variable">flights_with_origin</span> <span class="keyword">INTO</span> <span class="constants">'accumulo://flights_with_airports?instance=accumulo1.4&amp;user=root&amp;password=secret&amp;zookeepers=localhost'</span> \
-<span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage(<span class="constants">'origin,destination,departure_time,scheduled_departure_time,flight_number,taxi_in,taxi_out,name,state,code,country,city'</span>);
-</pre>
+## File Storage
 
-<p> Vestibulum vulputate nisi non imperdiet elementum. Pellentesque at
-consequat nisi. Fusce ut luctus justo. Aenean tincidunt ut risus
-condimentum convallis. Praesent eget tristique risus. Cras pellentesque sed
-libero ac elementum. Quisque tempus commodo neque, laoreet accumsan lectus
-sollicitudin eget. In convallis neque nisi, a iaculis neque interdum ac.
-Suspendisse in ante lacinia dolor faucibus auctor.
-</p>
+Accumulo provides many other desirable features when it comes to data management over "hand rolled" solutions using
+flat-files in HDFS.
 
-<p>Nulla fringilla quis turpis a gravida. Quisque tellus arcu, sagittis et sapien
-ut, imperdiet scelerisque est. Duis sapien mi, elementum vitae sem quis, varius
-tincidunt tortor. In commodo semper magna. Donec ultrices nunc est, nec
-volutpat leo porta scelerisque. Praesent tellus leo, scelerisque eget tortor
-eget, posuere sodales nulla. Mauris imperdiet magna eget tristique consequat.
-Nullam adipiscing at arcu in vestibulum. Donec consectetur justo sed odio
-vehicula, vel lobortis libero vehicula. Fusce rutrum justo lorem, sed bibendum
-ipsum ultrices eget. Praesent lobortis justo quis sem adipiscing rutrum ac eget
-nisi. Pellentesque et justo in leo rutrum rhoncus a ut neque. Fusce faucibus,
-orci nec venenatis dapibus, est leo ornare eros, ac adipiscing erat felis sit
-amet tellus. Nulla vehicula ipsum sit amet accumsan tempor.
-</p>
+### Sorted
 
-<p>Nulla ac est tincidunt, lacinia quam nec, mollis ante. Nulla ut tincidunt
-massa, vel laoreet elit. Aliquam erat volutpat. Mauris varius dolor in eros
-blandit adipiscing. Nam ultrices tellus quam, eu porta quam varius ac.
-Phasellus in massa fringilla, mattis nisi vel, condimentum diam. Cras porttitor
-eget arcu vel tempor.
-</p>
+All data stored in Accumulo is sorted lexicographically. New data which is written to Accumulo is also written in sorted
+order, while reads against Accumulo performed a merged-read against these sorted streams of data to provide a globally
+sorted view over the table. This feature opens the door to many algorithms that can run efficiently over sorted data
+sets.
 
-<p>Ut id vestibulum lorem. Fusce vitae metus sed magna tincidunt vestibulum. Fusce
-in eros ac nulla vestibulum venenatis vitae vitae nisi. Donec elementum neque
-ac viverra cursus. Morbi tincidunt venenatis tellus, id facilisis nibh viverra
-eget. Aenean pellentesque gravida orci, sed elementum nisl vulputate at.
-Suspendisse ut orci vitae tortor viverra egestas id scelerisque ante. Praesent
-vel tempor justo, id tempor lacus. Proin convallis vehicula mauris. Suspendisse
-tincidunt et libero vitae condimentum. Nam arcu urna, sollicitudin nec diam
-congue, ultricies hendrerit mi. Vivamus viverra elit in libero rutrum commodo.
-Ut eget varius arcu, ac venenatis tellus. Quisque rutrum blandit velit in
-sollicitudin. Maecenas nibh purus, consectetur at elementum at, dictum et
-dolor. 
-</p>
+### Tablets
+
+Accumulo organizes data in tables. Each table is made up of multiple tablets. Each tablet contains at minimum one row
+and can be composed of many files in HDFS. In practice, most tablets in Accumulo will contain many rows. As new data is
+inserted into a table, Accumulo will manage how this data is written to HDFS. As new data is ingested and written to a
+tablet, that tablet will eventually split from one tablet into many. As these splits occurs, Accumulo manages each of
+these files in HDFS for you transparantly alleviating the necessity to implement data retention and organizational logic
+in the application.
+
+## Indexing
+
+In addition to the trivial "map in row" layout, more advanced table schemas exist such as inverted indexes,
+document-partitioned indexes, and edge lists to name a few. All of these can be expressed using the same "5 tuple" Key
+data model that Accumulo provides.
+
+Next, how to [use Pig to manipulate "map in row" datasets in Accumulo](/docs/map-storage).

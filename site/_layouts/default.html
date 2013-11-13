@@ -24,7 +24,7 @@
     <body>
         <div id="content">
             <div id="header">
-                <span class="h1">Accumulo storage with Pig</span>
+                <span class="h1">{% if page.title %} {{ page.title }} {% else %} Accumulo storage with Pig {% endif %}</span>
                 <span style="float:right;"><img src="/images/pig.gif" height="70px" alt="pig" /><img src="/images/accumulo.png" height="70px" alt="accumulo" style="padding-left:15px"/></span>
             </div>
             {{ content }}

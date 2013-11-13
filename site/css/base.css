@@ -45,6 +45,7 @@ pre.code {
     overflow: auto;
     padding-left: 20px;
     padding-top: 15px;
+    padding-bottom: 15px;
     background-color: #909090;
     
     border: 1px solid black;
