@@ -18,27 +18,27 @@ column names to write the data into Accumulo. We need to make sure we include th
 _AccumuloStorage_ implementation we're leveraging, in addition to the Accumulo, Thrift and ZooKeeper dependencies.
 
 <pre class="code">
-register /path/to/accumulo-pig-1.4.4-SNAPSHOT.jar;
-register /usr/local/lib/accumulo/lib/accumulo-core-1.4.4.jar;
-register /usr/local/lib/accumulo/lib/libthrift-0.6.1.jar;
-register /usr/local/lib/zookeeper/zookeeper-3.4.5.jar;
-register /usr/local/lib/accumulo/lib/cloudtrace-1.4.4.jar;
+<span class="keyword">REGISTER</span> <span class="constants">/path/to/accumulo-pig-1.4.4-SNAPSHOT.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/accumulo/lib/accumulo-core-1.4.4.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/accumulo/lib/libthrift-0.6.1.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/zookeeper/zookeeper-3.4.5.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/accumulo/lib/cloudtrace-1.4.4.jar;</span>
 
-DEFINE FORMAT org.apache.accumulo.pig.FORMAT();
+<span class="keyword">DEFINE</span> FORMAT org.apache.accumulo.pig.FORMAT();
 
-flight_data = LOAD '/flights.csv' using PigStorage(',') as (year:int, month:int, dayofmonth:int, dayofweek:int, departure_time:int, scheduled_departure_time:int, 
-        arrival_time:int, scheduled_arrival_time:int, carrier:chararray, flight_number:int, tail_number:chararray, actual_elapsed_time:int, 
-        scheduled_elapsed_time:int, air_time:int, arrival_delay:int, departure_delay:int, origin:chararray, destination:chararray, 
-        distance:int, taxi_in:int, taxi_out:int, cancelled:int, cancellation_code:chararray, diverted:int, carrier_delay:chararray, 
-        weather_delay:chararray, nas_delay:chararray, security_delay:chararray, late_aircraft_delay:chararray);
+<span class="variable">flight_data</span> = <span class="keyword">LOAD</span> <span class="constants">'/flights.csv'</span> <span class="keyword">USING</span> PigStorage(<span class="constants">','</span>) <span class="keyword">AS</span> (year:<span class="type">int</span>, month:<span class="type">int</span>, dayofmonth:<span class="type">int</span>, dayofweek:<span class="type">int</span>, departure_time:<span class="type">int</span>, scheduled_departure_time:<span class="type">int</span>, 
+        arrival_time:<span class="type">int</span>, scheduled_arrival_time:<span class="type">int</span>, carrier:<span class="type">chararray</span>, flight_number:<span class="type">int</span>, tail_number:<span class="type">chararray</span>, actual_elapsed_time:<span class="type">int</span>, 
+        scheduled_elapsed_time:<span class="type">int</span>, air_time:<span class="type">int</span>, arrival_delay:<span class="type">int</span>, departure_delay:<span class="type">int</span>, origin:<span class="type">chararray</span>, destination:<span class="type">chararray</span>, 
+        distance:<span class="type">int</span>, taxi_in:<span class="type">int</span>, taxi_out:<span class="type">int</span>, cancelled:<span class="type">int</span>, cancellation_code:<span class="type">chararray</span>, diverted:<span class="type">int</span>, carrier_delay:<span class="type">chararray</span>, 
+        weather_delay:<span class="type">chararray</span>, nas_delay:<span class="type">chararray</span>, security_delay:<span class="type">chararray</span>, late_aircraft_delay:<span class="type">chararray</span>);
 
-flight_data = FOREACH flight_data GENERATE CONCAT(FORMAT('%04d-%02d-%02d', year, month, dayofmonth), CONCAT('_', CONCAT(carrier, CONCAT('_', (chararray)flight_number)))) as rowkey,
+<span class="variable">flight_data</span> = <span class="keyword">FOREACH</span> <span class="variable">flight_data</span> <span class="keyword">GENERATE</span> <span class="keyword">CONCAT</span>(FORMAT(<span class="constants">'%04d-%02d-%02d'</span>, year, month, dayofmonth), <span class="keyword">CONCAT</span>(<span class="constants">'_'</span>, <span class="keyword">CONCAT</span>(carrier, <span class="keyword">CONCAT</span>(<span class="constants">'_'</span>, (<span class="type">chararray</span>)flight_number)))) <span class="keyword">AS</span> rowkey,
         departure_time, scheduled_departure_time, arrival_time, scheduled_arrival_time, carrier, flight_number, tail_number, actual_elapsed_time, scheduled_elapsed_time, air_time,
         arrival_delay, departure_delay, origin, destination, distance, taxi_in, taxi_out, cancelled, cancellation_code, diverted, carrier_delay, weather_delay, nas_delay,
         security_delay, late_aircraft_delay;
 
-STORE flight_data into 'accumulo://flights?instance=accumulo&amp;user=root&amp;password=secret&amp;zookeepers=localhost' using 
-        org.apache.accumulo.pig.AccumuloStorage('departure_time,scheduled_departure_time,arrival_time,scheduled_arrival_time,carrier,flight_number,tail_number,actual_elapsed_time,scheduled_elapsed_time,air_time,arrival_delay,departure_delay,origin,destination,distance,taxi_in,taxi_out,cancelled,cancellation_code,diverted,carrier_delay,weather_delay,nas_delay,security_delay,late_aircraft_delay');
+<span class="keyword">STORE</span> <span class="variable">flight_data</span> <span class="keyword">INTO</span> <span class="constants">'accumulo://flights?instance=accumulo&amp;user=root&amp;password=secret&amp;zookeepers=localhost'</span> <span class="keyword">USING</span>
+        org.apache.accumulo.pig.AccumuloStorage(<span class="constants">'departure_time,scheduled_departure_time,arrival_time,scheduled_arrival_time,carrier,flight_number,tail_number,actual_elapsed_time,scheduled_elapsed_time,air_time,arrival_delay,departure_delay,origin,destination,distance,taxi_in,taxi_out,cancelled,cancellation_code,diverted,carrier_delay,weather_delay,nas_delay,security_delay,late_aircraft_delay'</span>);
 </pre>
 
 This will load a years worth of data into Accumulo with a rowkey that is the concatenation of the year, month and day of
@@ -48,29 +48,31 @@ Accumulo.
 Next, we want to do the same for the airport information:
 
 <pre class="code">
-register /path/to/accumulo-pig-1.4.4-SNAPSHOT.jar;
-register /usr/local/lib/accumulo/lib/accumulo-core-1.4.4.jar;
-register /usr/local/lib/accumulo/lib/libthrift-0.6.1.jar;
-register /usr/local/lib/zookeeper/zookeeper-3.4.5.jar;
-register /usr/local/lib/accumulo/lib/cloudtrace-1.4.4.jar;
+<span class="keyword">REGISTER</span> <span class="constants">/path/to/accumulo-pig-1.4.4-SNAPSHOT.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/accumulo/lib/accumulo-core-1.4.4.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/accumulo/lib/libthrift-0.6.1.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/zookeeper/zookeeper-3.4.5.jar;</span>
+<span class="keyword">REGISTER</span> <span class="constants">/usr/local/lib/accumulo/lib/cloudtrace-1.4.4.jar;</span>
 
-airports = LOAD '/airports.csv' using PigStorage(',') as (code:chararray, name:chararray, city:chararray, state:chararray, country:chararray, latitude:double, longitude:double);
+<span class="variable">airports</span> = <span class="keyword">LOAD</span> <span class="constants">'/airports.csv'</span> <span class="keyword">USING</span> PigStorage(<span class="constants">','</span>) <span class="keyword">AS</span> (code:<span class="type">chararray</span>, name:<span class="type">chararray</span>, city:<span class="type">chararray</span>, state:<span class="type">chararray</span>, country:<span class="type">chararray</span>, latitude:<span class="type">double</span>, longitude:<span class="type">double</span>);
+  
+<span class="comment">-- Cleanse the records</span>
+<span class="variable">airports</span> = <span class="keyword">FOREACH</span> <span class="variable">airports</span> <span class="keyword">GENERATE</span> <span class="keyword">REPLACE</span>(code, <span class="constants">'"'</span>, <span class="constants">''</span>) <span class="keyword">AS</span> code, <span class="keyword">REPLACE</span>(name, <span class="constants">'"'</span>, <span class="constants">''</span>) <span class="keyword">AS</span> name, <span class="keyword">REPLACE</span>(city, <span class="constants">'"'</span>, <span class="constants">''</span>) <span class="keyword">AS</span> city, 
+        <span class="keyword">REPLACE</span>(state, <span class="constants">'"'</span>, <span class="constants">''</span>) <span class="keyword">AS</span> state, <span class="keyword">REPLACE</span>(country, <span class="constants">'"'</span>, <span class="constants">''</span>) <span class="keyword">AS</span> country, latitude, longitude;
 
-airports = FOREACH airports GENERATE REPLACE(code, '"', '') as code, REPLACE(name, '"', '') as name, REPLACE(city, '"', '') as city, 
-        REPLACE(state, '"', '') as state, REPLACE(country, '"', '') as country, latitude, longitude;
+<span class="variable">airports</span> = <span class="keyword">FOREACH</span> <span class="variable">airports</span> <span class="keyword">GENERATE</span> code <span class="keyword">AS</span> rowkey, code, name, city, state, country, latitude, longitude;
 
-airports = FOREACH airports GENERATE code as rowkey, code, name, city, state, country, latitude, longitude;
-
-STORE airports into 'accumulo://airports?instance=accumulo&amp;user=root&amp;password=secret&amp;zookeepers=localhost' using 
-        org.apache.accumulo.pig.AccumuloStorage('code,name,city,state,country,latitude,longitude');
+<span class="keyword">STORE</span> <span class="variable">airports</span> <span class="keyword">INTO</span> <span class="constants">'accumulo://airports?instance=accumulo&amp;user=root&amp;password=secret&amp;zookeepers=localhost'</span> <span class="keyword">USING</span> 
+        org.apache.accumulo.pig.AccumuloStorage(<span class="constants">'code,name,city,state,country,latitude,longitude'</span>);
 </pre>
 
 At this point, we now have flight information in the 'flight_data' Accumulo table and airport information in the
-'airports' Accumulo table. We can join information about the origin airport code with the actual airport information.
+'airports' Accumulo table. We can project our flight data down to just departure flight information and join this
+information about the origin airport code with the actual airport information.
 
 <pre class="code">
 <span class="comment">-- Read a reduced set of our flight data</span>
-<span class="variable">flight_data</span> = <span class="keyword">LOAD</span> <span class="constants">'accumulo://flights?instance=accumulo&amp;user=pig&amp;password=password&amp;zookeepers=localhost&amp;fetch_columns=destination,departure_time,scheduled_departure_time,flight_number,taxi_in,taxi_out,origin'</span>
+<span class="variable">flight_data</span> = <span class="keyword">LOAD</span> <span class="constants">'accumulo://flights?instance=accumulo&amp;user=pig&amp;password=password&amp;zookeepers=localhost&amp;fetch_columns=departure_time,scheduled_departure_time,flight_number,taxi_out,origin&amp;begin=2001&amp;end=2003'</span>
 <span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage() <span class="keyword">AS</span> (rowkey:<span class="type">chararray</span>, data:<span class="type">map[]</span>);
 
 <span class="comment">-- Also read airport information</span>
@@ -78,8 +80,8 @@ At this point, we now have flight information in the 'flight_data' Accumulo tabl
 org.apache.accumulo.pig.AccumuloStorage() <span class="keyword">AS</span> (rowkey:<span class="type">chararray</span>, data:<span class="type">map[]</span>);
 
 <span class="comment">-- Permute the map</span>
-<span class="variable">flight_data</span> = <span class="keyword">FOREACH</span> <span class="variable">flight_data</span> <span class="keyword">GENERATE</span> rowkey, data#<span class="constants">'origin'</span> <span class="keyword">AS</span> origin, data#<span class="constants">'destination'</span> <span class="keyword">AS</span> destination, data#<span class="constants">'departure_time'</span> <span class="keyword">AS</span> departure_time,
-data#<span class="constants">'scheduled_departure_time'</span> <span class="keyword">AS</span> scheduled_departure_time, data#<span class="constants">'flight_number'</span> <span class="keyword">AS</span> flight_number, data#<span class="constants">'taxi_in'</span> <span class="keyword">AS</span> taxi_in, data#<span class="constants">'taxi_out'</span> <span class="keyword">AS</span> taxi_out;
+<span class="variable">flight_data</span> = <span class="keyword">FOREACH</span> <span class="variable">flight_data</span> <span class="keyword">GENERATE</span> rowkey, data#<span class="constants">'origin'</span> <span class="keyword">AS</span> origin, data#<span class="constants">'departure_time'</span> <span class="keyword">AS</span> departure_time,
+data#<span class="constants">'scheduled_departure_time'</span> <span class="keyword">AS</span> scheduled_departure_time, data#<span class="constants">'flight_number'</span> <span class="keyword">AS</span> flight_number, data#<span class="constants">'taxi_out'</span> <span class="keyword">AS</span> taxi_out;
 
 <span class="comment">-- Permute the map</span>
 <span class="variable">airports</span> = <span class="keyword">FOREACH</span> <span class="variable">airports</span> <span class="keyword">GENERATE</span> data#<span class="constants">'name'</span> <span class="keyword">AS</span> name, data#<span class="constants">'state'</span> <span class="keyword">AS</span> state, data#<span class="constants">'code'</span> <span class="keyword">AS</span> code, data#<span class="constants">'country'</span> <span class="keyword">AS</span> country, data#<span class="constants">'city'</span> <span class="keyword">AS</span> city;
@@ -88,6 +90,6 @@ data#<span class="constants">'scheduled_departure_time'</span> <span class="keyw
 <span class="variable">flights_with_origin</span> = <span class="keyword">JOIN</span> <span class="variable">flight_data</span> <span class="keyword">BY</span> origin, <span class="variable">airports</span> <span class="keyword">BY</span> code;
 
 <span class="comment">-- Store this information back into Accumulo in a new table</span>
-<span class="keyword">STORE</span> <span class="variable">flights_with_origin</span> <span class="keyword">INTO</span> <span class="constants">'accumulo://flights_with_airports?instance=accumulo1.4&amp;user=root&amp;password=secret&amp;zookeepers=localhost'</span> \
-<span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage(<span class="constants">'origin,destination,departure_time,scheduled_departure_time,flight_number,taxi_in,taxi_out,name,state,code,country,city'</span>);
+<span class="keyword">STORE</span> <span class="variable">flights_with_origin</span> <span class="keyword">INTO</span> <span class="constants">'accumulo://flights_with_airports?instance=accumulo&amp;user=root&amp;password=secret&amp;zookeepers=localhost'</span>
+        <span class="keyword">USING</span> org.apache.accumulo.pig.AccumuloStorage(<span class="constants">'origin,departure_time,scheduled_departure_time,flight_number,taxi_out,name,state,code,country,city'</span>);
 </pre>
