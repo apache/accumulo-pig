@@ -26,10 +26,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import java.util.Properties;
 
+import org.apache.accumulo.core.client.AccumuloSecurityException;
+import org.apache.accumulo.core.client.BatchWriterConfig;
 import org.apache.accumulo.core.client.mapreduce.AccumuloInputFormat;
 import org.apache.accumulo.core.client.mapreduce.AccumuloOutputFormat;
+import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Range;
@@ -77,7 +81,6 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   private static final String COLON = ":", COMMA = ",";
   private static final String INPUT_PREFIX = AccumuloInputFormat.class.getSimpleName();
 
-  private Configuration conf;
   private RecordReader<Key,Value> reader;
   private RecordWriter<Text,Mutation> writer;
 
@@ -103,6 +106,10 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   protected String contextSignature = null;
 
   public AbstractAccumuloStorage() {}
+
+  protected Map<String,String> getInputFormatEntries(Configuration conf) {
+    return getEntries(conf, INPUT_PREFIX);
+  }
 
   @Override
   public Tuple getNext() throws IOException {
@@ -202,10 +209,6 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     return writer;
   }
 
-  protected Map<String,String> getInputFormatEntries(Configuration conf) {
-    return getEntries(conf, INPUT_PREFIX);
-  }
-
   protected Map<String,String> getEntries(Configuration conf, String prefix) {
     Map<String,String> entries = new HashMap<String,String>();
 
@@ -221,44 +224,50 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
 
   @Override
   public void setLocation(String location, Job job) throws IOException {
-    conf = job.getConfiguration();
     setLocationFromUri(location);
 
-    Map<String,String> entries = getInputFormatEntries(conf);
-
+    Map<String,String> entries = getInputFormatEntries(job.getConfiguration());
     for (String key : entries.keySet()) {
-      conf.unset(key);
+      job.getConfiguration().unset(key);
     }
 
-    AccumuloInputFormat.setInputInfo(conf, user, password.getBytes(), table, authorizations);
-    AccumuloInputFormat.setZooKeeperInstance(conf, inst, zookeepers);
+    try {
+      AccumuloInputFormat.setConnectorInfo(job, user, new PasswordToken(password));
+    } catch (AccumuloSecurityException e) {
+      throw new IOException(e);
+    }
+
+    AccumuloInputFormat.setInputTableName(job, table);
+    AccumuloInputFormat.setScanAuthorizations(job, authorizations);
+    AccumuloInputFormat.setZooKeeperInstance(job, inst, zookeepers);
+
     if (columnFamilyColumnQualifierPairs.size() > 0) {
       LOG.info("columns: " + columnFamilyColumnQualifierPairs);
-      AccumuloInputFormat.fetchColumns(conf, columnFamilyColumnQualifierPairs);
+      AccumuloInputFormat.fetchColumns(job, columnFamilyColumnQualifierPairs);
     }
 
     Collection<Range> ranges = Collections.singleton(new Range(start, end));
 
     LOG.info("Scanning Accumulo for " + ranges + " for table " + table);
 
-    AccumuloInputFormat.setRanges(conf, ranges);
+    AccumuloInputFormat.setRanges(job, ranges);
 
-    configureInputFormat(conf);
+    configureInputFormat(job);
   }
 
   /**
-   * Method to allow specific implementations to add more elements to the Configuration for reading data from Accumulo.
+   * Method to allow specific implementations to add more elements to the Job for reading data from Accumulo.
    * 
-   * @param conf
+   * @param job
    */
-  protected void configureInputFormat(Configuration conf) {}
+  protected void configureInputFormat(Job job) {}
 
   /**
-   * Method to allow specific implementations to add more elements to the Configuration for writing data to Accumulo.
+   * Method to allow specific implementations to add more elements to the Job for writing data to Accumulo.
    * 
-   * @param conf
+   * @param job
    */
-  protected void configureOutputFormat(Configuration conf) {}
+  protected void configureOutputFormat(Job job) {}
 
   @Override
   public String relativeToAbsolutePath(String location, Path curDir) throws IOException {
@@ -288,20 +297,30 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   }
 
   public void setStoreLocation(String location, Job job) throws IOException {
-    conf = job.getConfiguration();
     setLocationFromUri(location);
-    
-    // TODO If Pig ever uses a MultipleOutputs-esque construct, this approach will fall apart
-    if (conf.get(AccumuloOutputFormat.class.getSimpleName() + ".configured") == null) {
-      AccumuloOutputFormat.setOutputInfo(conf, user, password.getBytes(), true, table);
-      AccumuloOutputFormat.setZooKeeperInstance(conf, inst, zookeepers);
-      AccumuloOutputFormat.setMaxLatency(conf, maxLatency);
-      AccumuloOutputFormat.setMaxMutationBufferSize(conf, maxMutationBufferSize);
-      AccumuloOutputFormat.setMaxWriteThreads(conf, maxWriteThreads);
+
+    // If Pig ever uses an approach like they handle inputs (load), this will fall apart.
+    // Currently, it appears that multiple stores will get new m/r jobs
+    if (job.getConfiguration().get(AccumuloOutputFormat.class.getSimpleName() + ".configured") == null) {
+      try {
+        AccumuloOutputFormat.setConnectorInfo(job, user, new PasswordToken(password));
+      } catch (AccumuloSecurityException e) {
+        throw new IOException(e);
+      }
+
+      // AccumuloOutputFormat.setCreateTables(job, true);
+      // AccumuloOutputFormat.setDefaultTableName(job, table);
+      AccumuloOutputFormat.setZooKeeperInstance(job, inst, zookeepers);
+
+      BatchWriterConfig bwConfig = new BatchWriterConfig();
+      bwConfig.setMaxLatency(maxLatency, TimeUnit.MILLISECONDS);
+      bwConfig.setMaxMemory(maxMutationBufferSize);
+      bwConfig.setMaxWriteThreads(maxWriteThreads);
+      AccumuloOutputFormat.setBatchWriterOptions(job, bwConfig);
 
       LOG.info("Writing data to " + table);
 
-      configureOutputFormat(conf);
+      configureOutputFormat(job);
     }
   }
 
