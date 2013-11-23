@@ -79,7 +79,9 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   private static final Log LOG = LogFactory.getLog(AbstractAccumuloStorage.class);
 
   private static final String COLON = ":", COMMA = ",";
+
   private static final String INPUT_PREFIX = AccumuloInputFormat.class.getSimpleName();
+  private static final String OUTPUT_PREFIX = AccumuloOutputFormat.class.getSimpleName();
 
   private RecordReader<Key,Value> reader;
   private RecordWriter<Text,Mutation> writer;
@@ -109,6 +111,10 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
 
   protected Map<String,String> getInputFormatEntries(Configuration conf) {
     return getEntries(conf, INPUT_PREFIX);
+  }
+  
+  protected Map<String,String> getOutputFormatEntries(Configuration conf) {
+    return getEntries(conf, OUTPUT_PREFIX);
   }
 
   @Override
@@ -298,30 +304,30 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
 
   public void setStoreLocation(String location, Job job) throws IOException {
     setLocationFromUri(location);
-
-    // If Pig ever uses an approach like they handle inputs (load), this will fall apart.
-    // Currently, it appears that multiple stores will get new m/r jobs
-    if (job.getConfiguration().get(AccumuloOutputFormat.class.getSimpleName() + ".configured") == null) {
-      try {
-        AccumuloOutputFormat.setConnectorInfo(job, user, new PasswordToken(password));
-      } catch (AccumuloSecurityException e) {
-        throw new IOException(e);
-      }
-
-      // AccumuloOutputFormat.setCreateTables(job, true);
-      // AccumuloOutputFormat.setDefaultTableName(job, table);
-      AccumuloOutputFormat.setZooKeeperInstance(job, inst, zookeepers);
-
-      BatchWriterConfig bwConfig = new BatchWriterConfig();
-      bwConfig.setMaxLatency(maxLatency, TimeUnit.MILLISECONDS);
-      bwConfig.setMaxMemory(maxMutationBufferSize);
-      bwConfig.setMaxWriteThreads(maxWriteThreads);
-      AccumuloOutputFormat.setBatchWriterOptions(job, bwConfig);
-
-      LOG.info("Writing data to " + table);
-
-      configureOutputFormat(job);
+    
+    Map<String,String> entries = getOutputFormatEntries(job.getConfiguration());
+    for (String key : entries.keySet()) {
+      job.getConfiguration().unset(key);
     }
+
+    try {
+      AccumuloOutputFormat.setConnectorInfo(job, user, new PasswordToken(password));
+    } catch (AccumuloSecurityException e) {
+      throw new IOException(e);
+    }
+
+    AccumuloOutputFormat.setCreateTables(job, true);
+    AccumuloOutputFormat.setZooKeeperInstance(job, inst, zookeepers);
+
+    BatchWriterConfig bwConfig = new BatchWriterConfig();
+    bwConfig.setMaxLatency(maxLatency, TimeUnit.MILLISECONDS);
+    bwConfig.setMaxMemory(maxMutationBufferSize);
+    bwConfig.setMaxWriteThreads(maxWriteThreads);
+    AccumuloOutputFormat.setBatchWriterOptions(job, bwConfig);
+
+    LOG.info("Writing data to " + table);
+
+    configureOutputFormat(job);
   }
 
   @SuppressWarnings("rawtypes")

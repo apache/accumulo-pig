@@ -94,6 +94,7 @@ public class AbstractAccumuloStorageTest {
     }
     
     AccumuloOutputFormat.setZooKeeperInstance(expected, inst, zookeepers);
+    AccumuloOutputFormat.setCreateTables(expected, true);
     
     BatchWriterConfig bwConfig = new BatchWriterConfig();
     bwConfig.setMaxLatency(maxWriteLatencyMS, TimeUnit.MILLISECONDS);
