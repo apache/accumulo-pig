@@ -22,12 +22,13 @@ import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.TimeUnit;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.accumulo.core.client.AccumuloSecurityException;
 import org.apache.accumulo.core.client.BatchWriterConfig;
@@ -115,6 +116,63 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
   
   protected Map<String,String> getOutputFormatEntries(Configuration conf) {
     return getEntries(conf, OUTPUT_PREFIX);
+  }
+  
+  /**
+   * Removes the given values from the configuration, accounting for changes in the Configuration
+   * API given the version of Hadoop being used.
+   * @param conf
+   * @param entriesToUnset
+   */
+  protected void unsetEntriesFromConfiguration(Configuration conf, Map<String,String> entriesToUnset) {
+    boolean configurationHasUnset = true;
+    try {
+      conf.getClass().getMethod("unset", String.class);
+    } catch (NoSuchMethodException e) {
+      configurationHasUnset = false;
+    } catch (SecurityException e) {
+      configurationHasUnset = false;
+    }
+    
+    // Only Hadoop >=1.2.0 and >=0.23 actually contains the method Configuration#unset
+    if (configurationHasUnset) {
+      simpleUnset(conf, entriesToUnset);
+    } else {
+      // If we're running on something else, we have to remove everything and re-add it
+      replaceUnset(conf, entriesToUnset);
+    }
+  }
+  
+  /**
+   * Unsets elements in the Configuration using the unset method
+   * @param conf
+   * @param entriesToUnset
+   */
+  protected void simpleUnset(Configuration conf, Map<String,String> entriesToUnset) {
+    for (String key : entriesToUnset.keySet()) {
+      conf.unset(key);
+    }
+  }
+  
+  /**
+   * Replaces the given entries in the configuration by clearing the Configuration
+   * and re-adding the elements that aren't in the Map of entries to unset
+   * @param conf
+   * @param entriesToUnset
+   */
+  protected void replaceUnset(Configuration conf, Map<String,String> entriesToUnset) {
+    // Gets a copy of the entries
+    Iterator<Entry<String,String>> originalEntries = conf.iterator();
+    conf.clear();
+    
+    while (originalEntries.hasNext()) {
+      Entry<String,String> originalEntry = originalEntries.next();
+      
+      // Only re-set() the pairs that aren't in our collection of keys to unset
+      if (!entriesToUnset.containsKey(originalEntry.getKey())) {
+        conf.set(originalEntry.getKey(), originalEntry.getValue());
+      }
+    }
   }
 
   @Override
@@ -233,9 +291,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     setLocationFromUri(location);
 
     Map<String,String> entries = getInputFormatEntries(job.getConfiguration());
-    for (String key : entries.keySet()) {
-      job.getConfiguration().unset(key);
-    }
+    unsetEntriesFromConfiguration(job.getConfiguration(), entries);
 
     try {
       AccumuloInputFormat.setConnectorInfo(job, user, new PasswordToken(password));
@@ -306,9 +362,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
     setLocationFromUri(location);
     
     Map<String,String> entries = getOutputFormatEntries(job.getConfiguration());
-    for (String key : entries.keySet()) {
-      job.getConfiguration().unset(key);
-    }
+    unsetEntriesFromConfiguration(job.getConfiguration(), entries);
 
     try {
       AccumuloOutputFormat.setConnectorInfo(job, user, new PasswordToken(password));
