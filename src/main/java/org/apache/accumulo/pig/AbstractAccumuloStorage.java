@@ -17,6 +17,8 @@
 package org.apache.accumulo.pig;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Collection;
@@ -139,7 +141,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
       simpleUnset(conf, entriesToUnset);
     } else {
       // If we're running on something else, we have to remove everything and re-add it
-      replaceUnset(conf, entriesToUnset);
+      clearUnset(conf, entriesToUnset);
     }
   }
   
@@ -149,8 +151,24 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
    * @param entriesToUnset
    */
   protected void simpleUnset(Configuration conf, Map<String,String> entriesToUnset) {
-    for (String key : entriesToUnset.keySet()) {
-      conf.unset(key);
+    try {
+      Method unset = conf.getClass().getMethod("unset", String.class);
+      
+      for (String key : entriesToUnset.keySet()) {
+        unset.invoke(conf, key);
+      }
+    } catch (NoSuchMethodException e) {
+      LOG.error("Could not invoke Configuration.unset method", e);
+      throw new RuntimeException(e);
+    } catch (IllegalAccessException e) {
+      LOG.error("Could not invoke Configuration.unset method", e);
+      throw new RuntimeException(e);
+    } catch (IllegalArgumentException e) {
+      LOG.error("Could not invoke Configuration.unset method", e);
+      throw new RuntimeException(e);
+    } catch (InvocationTargetException e) {
+      LOG.error("Could not invoke Configuration.unset method", e);
+      throw new RuntimeException(e);
     }
   }
   
@@ -160,7 +178,7 @@ public abstract class AbstractAccumuloStorage extends LoadFunc implements StoreF
    * @param conf
    * @param entriesToUnset
    */
-  protected void replaceUnset(Configuration conf, Map<String,String> entriesToUnset) {
+  protected void clearUnset(Configuration conf, Map<String,String> entriesToUnset) {
     // Gets a copy of the entries
     Iterator<Entry<String,String>> originalEntries = conf.iterator();
     conf.clear();
